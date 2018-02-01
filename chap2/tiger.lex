@@ -86,9 +86,9 @@ end
 <INITIAL>","	=> (Tokens.COMMA (yypos, yypos + 1));
 
 <INITIAL>[0-9]+	=> (Tokens.INT (valOf (Int.fromString yytext), yypos,yypos + size yytext));
-<INITIAL>[a-zA-Z]([a-zA-Z]|[0-9]|"_")	=> (Tokens.ID (yytext, yypos, yypos + size yytext));
+<INITIAL>[a-zA-Z]([a-zA-Z]|[0-9]|"_")*	=> (Tokens.ID (yytext, yypos, yypos + size yytext));
 
-<INITIAL>"\""	=> (YYBEGIN STRING; currentString :=""; stringStartPos := yypos; continue());
+<INITIAL>"\""	=> (YYBEGIN STRING; currentString := ""; stringStartPos := yypos; continue());
 <STRING>"\\"	=> (YYBEGIN ESCAPE; continue());
 <STRING>"\""	=> (YYBEGIN INITIAL; Tokens.STRING(!currentString, !stringStartPos, yypos + 1));
 <STRING>\n	=> (ErrorMsg.error yypos ("illegal newline character " ^ yytext); continue());
@@ -108,7 +108,7 @@ end
 <DOUBLE_ESCAPE>.	=> (ErrorMsg.error yypos ("illegal double escape character " ^ yytext); continue());
 <CONTROL>.	=> (controlToString (yytext,yypos); YYBEGIN STRING; continue ());
 
-<INITIAL>"/*"   => (YYBEGIN COMMENT; continue());
+<INITIAL>"/*"   => (commentDepth := !commentDepth + 1; YYBEGIN COMMENT; continue());
 <COMMENT>"/*"   => (commentDepth := !commentDepth + 1; continue ());
 <COMMENT>"*/"   => (commentDepth := !commentDepth - 1; if !commentDepth = 0 then YYBEGIN INITIAL else (); continue ());
 <COMMENT>\n     => (newLine (yypos); continue ());
