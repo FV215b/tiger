@@ -1,0 +1,7 @@
+The lexical analysis is implemented using the ML-Lex.
+The rule for key words and symbols is when regonize the keywords or symbols, call the corresponding function in Token.sml. Pass the starting and ending position to the function.
+The rule for comment involves two states, INITIAL and COMMENT. When reads /*, the lexer will go to comment states with depth 1. Whenever the lexer reads /*, it increments the depth, and whenever it reads */, it decreaments the depth. Ifthe comment depth is 0, it will go back to INITIAL state. This will allow the user to write nested comments.
+The rules for string involves four states. INITIAL, ESCAPE, DOUBLE_ESCAPE, and CONTROL. The lexel change from INITIAL state to STRING when it reads a ". It changes from STRING state to ESCAPE state when encounters a \. Then it will go to CONTROL or DOUBLE_ESCAPE for a ^C or /f....f/. After processing the ESCAPE, it will go back to STRING state.
+The way we handle control and \ddd might be different with the "standard" since different sources are explaining it differently. For \^C, we only allow C with ASCII code between 64 and 95, anything else will produce an error message. And for \ddd, we only allow digits between 0 and 255. And we only allow three digits. For example, we accepts \010 instead of \10.
+
+      
