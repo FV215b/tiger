@@ -5,9 +5,9 @@ val lineNum = ErrorMsg.lineNum
 val linePos = ErrorMsg.linePos
 val commentDepth = ref 0
 
-val currentString = ref ""
+val stringBuffer = ref ""
 val stringStartPos = ref 0
-fun appendS s = currentString := !currentString ^ s
+fun storeString s = stringBuffer := !stringBuffer ^ s
 fun newLine pos = (lineNum := !lineNum + 1; linePos := pos :: !linePos)
 
 fun dddToString (s,yypos) = 
@@ -15,8 +15,8 @@ let
   val value = valOf(Int.fromString s)
 in
 if value <= 255 andalso value >= 0 
-	then appendS (String.str (chr (value))) 
-	else ErrorMsg.error yypos ("ddd should beetween 255 and 0 in string")
+	then storeString (String.str (chr (value))) 
+	else ErrorMsg.error yypos ("Digits in \\ddd should beetween 0 and 255")
 end
 
 fun controlToString (s,yypos) =
@@ -24,8 +24,8 @@ let
   val value = ord (String.sub(s, 0))
 in 
 if value <= 95 andalso value >= 64 
-	then appendS (String.str (chr (value - 64))) 
-	else ErrorMsg.error yypos ("control should be between 64 and 95 in string")
+	then storeString (String.str (chr (value - 64))) 
+	else ErrorMsg.error yypos ("Invaild contorl command")
 end
 
 fun eof () = 
@@ -88,15 +88,15 @@ end
 <INITIAL>[0-9]+	=> (Tokens.INT (valOf (Int.fromString yytext), yypos,yypos + size yytext));
 <INITIAL>[a-zA-Z]([a-zA-Z]|[0-9]|"_")*	=> (Tokens.ID (yytext, yypos, yypos + size yytext));
 
-<INITIAL>[\"]	=> (YYBEGIN STRING; currentString := ""; stringStartPos := yypos; continue());
+<INITIAL>[\"]	=> (YYBEGIN STRING; stringBuffer := ""; stringStartPos := yypos; continue());
 <STRING>[\\]	=> (YYBEGIN ESCAPE; continue());
-<STRING>[\"]	=> (YYBEGIN INITIAL; Tokens.STRING(!currentString, !stringStartPos, yypos + 1));
+<STRING>[\"]	=> (YYBEGIN INITIAL; Tokens.STRING(!stringBuffer, !stringStartPos, yypos + 1));
 <STRING>\n	=> (ErrorMsg.error yypos ("illegal newline character " ^ yytext); continue());
-<STRING>. 	=> (appendS yytext; continue());
+<STRING>. 	=> (storeString yytext; continue());
 <ESCAPE>\n	=> (newLine yypos; YYBEGIN DOUBLE_ESCAPE; continue());
 <ESCAPE>[\ \t\f]	=> (YYBEGIN DOUBLE_ESCAPE; continue());
-<ESCAPE>n	=> (appendS "\n"; YYBEGIN STRING; continue());
-<ESCAPE>t	=> (appendS "\t"; YYBEGIN STRING; continue());
+<ESCAPE>n	=> (storeString "\n"; YYBEGIN STRING; continue());
+<ESCAPE>t	=> (storeString "\t"; YYBEGIN STRING; continue());
 
 <ESCAPE>[0-9]{3} => (dddToString (yytext, yypos); YYBEGIN STRING; continue());
 
