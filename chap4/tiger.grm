@@ -12,14 +12,24 @@ structure A = Absyn
   | ARRAY | IF | THEN | ELSE | WHILE | FOR | TO | DO | LET | IN | END | OF 
   | BREAK | NIL
   | FUNCTION | VAR | TYPE 
+  | UMINUS
 
 %nonterm  exp | program of A.exp
+		empty	
+		exps
 
 %pos int
 %verbose
 %start program
 %eop EOF
 %noshift EOF
+
+%nonassoc ASSIGN
+%left AND OR
+%nonassoc EQ NEQ LT LE GT GE
+%left PLUS MINUS
+%left TIMES DIVIDE
+%left UMINUS
 
 %name Tiger
 
@@ -36,5 +46,49 @@ structure A = Absyn
 
 program	: exp				(exp)
 
-	
-exp: NIL		(A.NilExp)
+exp
+	: NIL					(A.NilExp)
+	| INT 					()
+	| STRING 				()
+	| ID 					()
+	| valueless_exp			()
+	| seq_exp				()
+	| no_value 				()		# do we really need that
+	| MINUS exp 			%prec UMINUS ()
+	| call_exp				()
+
+lvalue
+	: ID					()
+	| lvalue DOT ID			()
+	| lvalue LBRACK exp RBRACK	()
+comma_exps
+	:		 				()
+	| exp 					()
+	| comma_exps COMMA exp 	()
+semi_exps
+	: exp 					()
+	| semi_exps SEMICOLON exp 	()
+seq_exp
+	: LPAREN semi_exps RPAREN	()
+exp: exp ASSIGN exp 		()
+arith_exp
+	: exp PLUS exp 			()
+	| exp MINUS exp 		()
+	| exp TIMES exp 		()
+	| exp DIVIDE exp 		()
+bool_exp
+	: exp AND exp 			()
+	| exp OR exp 			()
+call_exp: ID LPAREN comma_exps RPAREN	()
+comp_exp 
+	: exp EQ exp 			()
+	| exp NEQ exp 			()
+	| exp LT exp 			()
+	| exp LE exp 			()
+	| exp GT exp 			()
+	| exp GE exp 			()
+valueless_exp
+	:
+	|
+	|
+exp: ID LBRACE ID EQ exp RBRACE 	()
