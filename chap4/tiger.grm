@@ -23,7 +23,7 @@ structure A = Absyn
 %noshift EOF
 
 %left THEN
-%left DO ELSE
+%left DO OF ELSE
 %nonassoc ASSIGN
 %left AND OR
 %nonassoc EQ NEQ LT LE GT GE
@@ -48,61 +48,71 @@ program	: exp				(exp)
 
 exp
 	: NIL					(A.NilExp)
-	| INT 					()
-	| STRING 				()
-	| ID 					  ()
-	| MINUS exp 		%prec UMINUS ()
-  | arith_exp     ()
-  | bool_exp      ()
-  | comp_exp      ()
-  | LPAREN semi_exps RPAREN	()   (* exp_sequence *)
-  | ID LPAREN comma_exps RPAREN	()  (* call_exp/record_creation *)
-  | ID LBRACK exp RBRACK OF exp	()  (* array_creation *)
+	| INT 					(A.IntExp)
+	| STRING 				(A.StringExp)
+	| ID 					  (Symbol.symbol ID)
+	| MINUS exp 		%prec UMINUS (A.OpExp {left = A.IntExp 0, oper = A.MinusOp, right = exp, pos = MINUSleft})
+  | arith_exp     (arith_exp)
+  | bool_exp      (bool_exp)
+  | comp_exp      (comp_exp)
+  | LPAREN semi_exps RPAREN	(A.SeqExp semi_exps)   (* exp_sequence *)
+  | ID LPAREN comma_exps RPAREN	(A.CallExp {func= Symbol.symbol ID, args = comma_exps, pos = IDleft})  (* call_exp *)
+  | ID LBRACE comma_records RPAREN  (A.RecordExp {fields = comma_records, typ = Symbol.symbol ID, pos = IDleft})  (* record_creation *)
+  | ID LBRACK exp RBRACK OF exp	(A.ArrayExp {typ = Symbol.symbol ID, size = exp1, init = exp2, pos =IDleft})  (* array_creation *)
   | lvalue ASSIGN exp  		    ()
-  | IF exp THEN exp ELSE exp	()
-  | IF exp THEN exp		        ()
-  | WHILE exp DO exp		      ()
-  | FOR ID ASSIGN exp TO exp DO exp	()
-  | LET decs IN optional_exp END	      ()
-  | BREAK				  ()
+  | IF exp THEN exp ELSE exp	(A.IfExp {test = exp1, then' = SOME(exp2), else' = SOME(exp3), pos = exp1left})
+  | IF exp THEN exp		        (A.IfExp {test = exp1, then' = SOME(exp2), else' = NONE, pos = exp1left})
+  | WHILE exp DO exp		      (A.WhileExp {test = exp1, body = exp2, pos = WHILEleft})
+  | FOR ID ASSIGN exp TO exp DO exp	(A.ForExp {var = Symbol.symbol ID, escape = ref true, lo = exp1, hi = exp2, body = exp3, pos = FORleft})
+  | LET decs IN optional_exp END	      (A.LetExp {decs = decs, body = optional_exp, pos = LETleft})
+  | BREAK				  (A.BreakExp BREAKleft)
   | LPAREN optional_exp RPAREN         ()
 
 lvalue
-	: ID					()
+	: ID					 ()
 	| lvalue DOT ID			()
 	| lvalue LBRACK exp RBRACK	()
 
-no_value:         ()
-
 optional_exp
-  : exp             ()
-  | no_value        ()
+  :              ([])
+  | exp          ()
 
 comma_exps
-	:		 				()
-	| exp 					()
-	| comma_exps COMMA exp 	()
+	:		 				   ([])
+  | comma_exps_nonempty  (comma_exps_nonempty)
+
+comma_exps_nonempty
+	: exp 				 ([exp])
+	| comma_exps_nonempty COMMA exp 	(comma_exps_nonempty @ [exp])
+
+comma_records
+  :              ([])
+  | comma_records_nonempty  (comma_records_nonempty)
+
+comma_records_nonempty
+  : ID EQ exp    ((Symbol.symbol ID, exp, IDleft))
+  | comma_records_nonempty COMMA ID EQ exp  (comma_records_nonempty @ [(Symbol.symbol ID, exp, IDleft)])
 
 semi_exps
-	: exp 					()
-	| semi_exps SEMICOLON exp 	()
+	: exp 					([(exp, expleft)])
+	| semi_exps SEMICOLON exp 	(semi_exps @ [(exp, expleft)])
 
 arith_exp
-	: exp PLUS exp 			()
-	| exp MINUS exp 		()
-	| exp TIMES exp 		()
-	| exp DIVIDE exp 		()
+	: exp PLUS exp 			(A.OpExp {left = exp1, oper = A.PlusOp, right = exp2, pos = exp1left})
+	| exp MINUS exp 		(A.OpExp {left = exp1, oper = A.MinusOp, right = exp2, pos = exp1left})
+	| exp TIMES exp 		(A.OpExp {left = exp1, oper = A.TimesOp, right = exp2, pos = exp1left})
+	| exp DIVIDE exp 		(A.OpExp {left = exp1, oper = A.DivideOp, right = exp2, pos = exp1left})
 bool_exp
-	: exp AND exp 			()
-	| exp OR exp 			  ()
+	: exp AND exp 			(A.IfExp {test = exp1, then' = SOME(exp2), else' = SOME(A.IntExp 0), pos = exp1left})
+	| exp OR exp 			  (A.IfExp {test = exp1, then' = SOME(A.IntExp 1), else' = SOME(exp2), pos = exp1left})
 
 comp_exp
-	: exp EQ exp 			()
-	| exp NEQ exp 		()
-	| exp LT exp 			()
-	| exp LE exp 			()
-	| exp GT exp 			()
-	| exp GE exp 			()
+	: exp EQ exp 			(A.OpExp {left = exp1, oper = A.EqOp, right = exp2, pos = exp1left})
+	| exp NEQ exp 		(A.OpExp {left = exp1, oper = A.NeqOp, right = exp2, pos = exp1left})
+	| exp LT exp 			(A.OpExp {left = exp1, oper = A.LtOp, right = exp2, pos = exp1left})
+	| exp LE exp 			(A.OpExp {left = exp1, oper = A.LeOp, right = exp2, pos = exp1left})
+	| exp GT exp 			(A.OpExp {left = exp1, oper = A.GtOp, right = exp2, pos = exp1left})
+	| exp GE exp 			(A.OpExp {left = exp1, oper = A.GeOp, right = exp2, pos = exp1left})
 
 decs
   : dec				    ()
@@ -129,6 +139,9 @@ ty
 	| ARRAY OF ID			()
 
 tyfields
-	:				()
-	| ID COLON ID			()
-	| tyfields COMMA ID COLON ID 	()
+	:				    ([])
+  | tyfields_nonempty   ()
+
+tyfields_nonempty
+	: ID COLON ID			()
+	| tyfields_nonempty COMMA ID COLON ID 	()
