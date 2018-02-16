@@ -2,21 +2,19 @@ structure A = Absyn
 
 %%
 %term
-    EOF 
+    EOF
   | ID of string
-  | INT of int | STRING of string 
-  | COMMA | COLON | SEMICOLON | LPAREN | RPAREN | LBRACK | RBRACK 
-  | LBRACE | RBRACE | DOT 
+  | INT of int | STRING of string
+  | COMMA | COLON | SEMICOLON | LPAREN | RPAREN | LBRACK | RBRACK
+  | LBRACE | RBRACE | DOT
   | PLUS | MINUS | TIMES | DIVIDE | EQ | NEQ | LT | LE | GT | GE
   | AND | OR | ASSIGN
-  | ARRAY | IF | THEN | ELSE | WHILE | FOR | TO | DO | LET | IN | END | OF 
+  | ARRAY | IF | THEN | ELSE | WHILE | FOR | TO | DO | LET | IN | END | OF
   | BREAK | NIL
-  | FUNCTION | VAR | TYPE 
+  | FUNCTION | VAR | TYPE
   | UMINUS
 
 %nonterm  exp | program of A.exp
-		empty	
-		exps
 
 %pos int
 %verbose
@@ -24,6 +22,8 @@ structure A = Absyn
 %eop EOF
 %noshift EOF
 
+%left THEN
+%left DO ELSE
 %nonassoc ASSIGN
 %left AND OR
 %nonassoc EQ NEQ LT LE GT GE
@@ -33,7 +33,7 @@ structure A = Absyn
 
 %name Tiger
 
-%keyword WHILE FOR TO BREAK LET IN END FUNCTION VAR TYPE ARRAY IF THEN ELSE 
+%keyword WHILE FOR TO BREAK LET IN END FUNCTION VAR TYPE ARRAY IF THEN ELSE
 	DO OF NIL
 
 %prefer THEN ELSE LPAREN
@@ -50,27 +50,43 @@ exp
 	: NIL					(A.NilExp)
 	| INT 					()
 	| STRING 				()
-	| ID 					()
-	| valueless_exp			()
-	| seq_exp				()
-	| no_value 				()		# do we really need that
-	| MINUS exp 			%prec UMINUS ()
-	| call_exp				()
+	| ID 					  ()
+	| MINUS exp 		%prec UMINUS ()
+  | arith_exp     ()
+  | bool_exp      ()
+  | comp_exp      ()
+  | LPAREN semi_exps RPAREN	()   (* exp_sequence *)
+  | ID LPAREN comma_exps RPAREN	()  (* call_exp/record_creation *)
+  | ID LBRACK exp RBRACK OF exp	()  (* array_creation *)
+  | lvalue ASSIGN exp  		    ()
+  | IF exp THEN exp ELSE exp	()
+  | IF exp THEN exp		        ()
+  | WHILE exp DO exp		      ()
+  | FOR ID ASSIGN exp TO exp DO exp	()
+  | LET decs IN optional_exp END	      ()
+  | BREAK				  ()
+  | LPAREN optional_exp RPAREN         ()
 
 lvalue
 	: ID					()
 	| lvalue DOT ID			()
 	| lvalue LBRACK exp RBRACK	()
+
+no_value:         ()
+
+optional_exp
+  : exp             ()
+  | no_value        ()
+
 comma_exps
 	:		 				()
 	| exp 					()
 	| comma_exps COMMA exp 	()
+
 semi_exps
 	: exp 					()
 	| semi_exps SEMICOLON exp 	()
-seq_exp
-	: LPAREN semi_exps RPAREN	()
-exp: exp ASSIGN exp 		()
+
 arith_exp
 	: exp PLUS exp 			()
 	| exp MINUS exp 		()
@@ -78,65 +94,41 @@ arith_exp
 	| exp DIVIDE exp 		()
 bool_exp
 	: exp AND exp 			()
-	| exp OR exp 			()
-call_exp: ID LPAREN comma_exps RPAREN	()
-comp_exp 
+	| exp OR exp 			  ()
+
+comp_exp
 	: exp EQ exp 			()
-	| exp NEQ exp 			()
+	| exp NEQ exp 		()
 	| exp LT exp 			()
 	| exp LE exp 			()
 	| exp GT exp 			()
 	| exp GE exp 			()
-valueless_exp
-	:
-	|
-	|
-record_creation
-	: ID LBRACE comma_exps RBRACE 	()
-array_creation
-	: ID LBRACE exp RBRACE OF exp	()
 
-assignment
-	: lvalue ASSIGN exp  		()
-if_then_else
-	: IF exp THEN exp ELSE exp	()
-if_then
-	: IF exp THEN exp		()
-while_do
-	: WHILE exp DO exp		()
-for
-	: FOR ID ASSIGN exp TO exp DO exp	()
-break
-	: BREAK				()
-
-let	
-	:LET decs IN seq_exp END	()
 decs
-	:dec				()
-	|decs dec			()
+  : dec				    ()
+	| decs dec			()
 
 dec
-	:tydec				()
-	|vardec				()
-	|fundec				()
+	: tydec				  ()
+	| vardec				()
+	| fundec				()
 
-tydec
-	:TYPE ID EQ ty			()
+tydec: TYPE ID EQ ty			()
+
+vardec
+	: VAR ID ASSIGN exp		()
+	| VAR ID COLON ID ASSIGN exp	()
+
+fundec
+	: FUNCTION ID LPAREN tyfields RPAREN EQ exp	()
+	| FUNCTION ID LPAREN tyfields RPAREN COLON ID EQ exp
 
 ty
-	:ID				()
-	|LBRACE tyfields RBRACE		()
-	|ARRAY OF ID			()
+	: ID				()
+	| LBRACE tyfields RBRACE		()
+	| ARRAY OF ID			()
 
 tyfields
 	:				()
-	|ID COLON ID			()
-	|tyfields COMMA ID COLON ID 	()
-
-vardec 
-	:VAR ID ASSIGN exp		()
-	|VAR ID COLON ID ASSIGN exp	()
-	
-fundec
-	:FUNCTION ID LPAREN tyfields RPAREN EQ exp	()
-	|FUNCTION ID LPAREN tyfields RPAREN COLON ID EQ exp
+	| ID COLON ID			()
+	| tyfields COMMA ID COLON ID 	()
