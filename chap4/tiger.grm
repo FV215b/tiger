@@ -14,7 +14,7 @@ structure A = Absyn
   | FUNCTION | VAR | TYPE
   | UMINUS
 
-%nonterm  exp of A.exp | program of A.exp | lvalue of A.var | optional_exp of A.exp | comma_exps of A.exp list | 
+%nonterm  exp of A.exp | program of A.exp | lvalue of A.var | optional_exp of A.exp | comma_exps of A.exp list |
 comma_exps_nonempty of A.exp list | comma_records of (A.symbol * A.exp * A.pos) list | comma_records_nonempty of (A.symbol * A.exp * A.pos) list |
 semi_exps of (A.exp * A.pos) list | arith_exp of A.exp | bool_exp of A.exp | comp_exp of A.exp |
 decs of A.dec list | dec of A.dec | tydec of A.dec | vardec of A.dec | fundec of A.dec | ty of A.ty | tyfields of A.field list |
@@ -90,11 +90,11 @@ comma_exps_nonempty
 
 comma_records
   	:              				([])
-  	| comma_nonempty	  		(comma_nonempty)
+  	| comma_records_nonempty	  		(comma_records_nonempty)
 
-comma_nonempty
+comma_records_nonempty
   	: ID EQ exp 				((Symbol.symbol ID, exp, IDleft))
-  	| comma_nonempty COMMA ID EQ exp  	(comma_nonempty @ [(Symbol.symbol ID, exp, IDleft)])
+  	| comma_records_nonempty COMMA ID EQ exp  	(comma_records_nonempty @ [(Symbol.symbol ID, exp, IDleft)])
 
 semi_exps
 	: exp	 				([(exp, expleft)])
