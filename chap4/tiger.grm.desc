@@ -20,8 +20,8 @@ state 0:
 	BREAK	shift 7
 	NIL	shift 6
 
-	exp	goto 5
 	program	goto 142
+	exp	goto 5
 	lvalue	goto 4
 	arith_exp	goto 3
 	bool_exp	goto 2
@@ -59,6 +59,7 @@ state 3:
 
 state 4:
 
+	exp : lvalue .  (reduce by rule 2)
 	exp : lvalue . ASSIGN exp 
 	lvalue : lvalue . DOT ID 
 	lvalue : lvalue . LBRACK exp RBRACK 
@@ -68,7 +69,7 @@ state 4:
 	ASSIGN	shift 17
 
 
-	.	error
+	.	reduce by rule 2
 
 
 state 5:
@@ -115,11 +116,11 @@ state 6:
 
 state 7:
 
-	exp : BREAK .  (reduce by rule 19)
+	exp : BREAK .  (reduce by rule 20)
 
 
 
-	.	reduce by rule 19
+	.	reduce by rule 20
 
 
 state 8:
@@ -255,65 +256,36 @@ state 13:
 
 state 14:
 
-	exp : STRING .  (reduce by rule 3)
+	exp : STRING .  (reduce by rule 4)
+
+
+
+	.	reduce by rule 4
+
+
+state 15:
+
+	exp : INT .  (reduce by rule 3)
 
 
 
 	.	reduce by rule 3
 
-
-state 15:
-
-	exp : INT .  (reduce by rule 2)
-
-
-
-	.	reduce by rule 2
-
 error:  state 16: shift/reduce conflict (shift LBRACK, reduce by rule 21)
 
 state 16:
 
-	exp : ID .  (reduce by rule 4)
 	exp : ID . LPAREN comma_exps RPAREN 
 	exp : ID . LBRACE comma_records RPAREN 
 	exp : ID . LBRACK exp RBRACK OF exp 
 	lvalue : ID .  (reduce by rule 21)
 
-	EOF	reduce by rule 4
-	COMMA	reduce by rule 4
-	SEMICOLON	reduce by rule 4
 	LPAREN	shift 49
-	RPAREN	reduce by rule 4
 	LBRACK	shift 48
-	RBRACK	reduce by rule 4
 	LBRACE	shift 47
-	DOT	reduce by rule 21
-	PLUS	reduce by rule 4
-	MINUS	reduce by rule 4
-	TIMES	reduce by rule 4
-	DIVIDE	reduce by rule 4
-	EQ	reduce by rule 4
-	NEQ	reduce by rule 4
-	LT	reduce by rule 4
-	LE	reduce by rule 4
-	GT	reduce by rule 4
-	GE	reduce by rule 4
-	AND	reduce by rule 4
-	OR	reduce by rule 4
-	ASSIGN	reduce by rule 21
-	THEN	reduce by rule 4
-	ELSE	reduce by rule 4
-	TO	reduce by rule 4
-	DO	reduce by rule 4
-	IN	reduce by rule 4
-	END	reduce by rule 4
-	FUNCTION	reduce by rule 4
-	VAR	reduce by rule 4
-	TYPE	reduce by rule 4
 
 
-	.	error
+	.	reduce by rule 21
 
 
 state 17:
@@ -1637,11 +1609,11 @@ state 74:
 
 state 75:
 
-	exp : LPAREN optional_exp RPAREN .  (reduce by rule 20)
+	exp : LPAREN optional_exp RPAREN .  (reduce by rule 19)
 
 
 
-	.	reduce by rule 20
+	.	reduce by rule 19
 
 
 state 76:
@@ -2900,5 +2872,5 @@ state 142:
 
 	.	error
 
-559 of 1077 action table entries left after compaction
+531 of 1049 action table entries left after compaction
 207 goto table entries
