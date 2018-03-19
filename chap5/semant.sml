@@ -352,6 +352,26 @@ struct
 	      | SOME ty =>
 	            {name=name, ty=ty}
 	            
+	and transTy (tenv,A.NameTy(sym,pos)) =
+	    (* detect mutually recursive types *)
+	    (case S.look(tenv,sym) of SOME(t) => t)
+	
+	  | transTy (tenv,A.RecordTy(fields)) =
+	    (checkdup(map #name fields, map #pos fields);
+	     T.RECORD(
+	     (map (fn {name,escape,typ,pos} =>
+	              case S.look(tenv,typ) of
+	                SOME(t) => (name,t)
+	              | NONE => (err pos
+	                             ("undefined type " ^ S.name typ);
+	                         (name,T.UNIT))) fields), ref()))
+	
+	  | transTy (tenv,A.ArrayTy(sym,pos)) =
+	    case S.look(tenv,sym) of
+	      SOME(t) => T.ARRAY(t,ref())
+	    | NONE => (err pos ("undefined type " ^ S.name sym);
+               T.ARRAY(T.NIL,ref()))
+	            
 	            
 	fun transProg(exp:Absyn.exp) =
     let
