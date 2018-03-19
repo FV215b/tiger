@@ -8,6 +8,11 @@ symbol.sml
 parse.sml
 tiger.lex
 tiger.grm
+env.sml
+semant.sml
+types.sml
+main.sml
 $/smlnj-lib.cm
 $/ml-yacc-lib.cm
 $/basis.cm
+
