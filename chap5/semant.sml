@@ -244,7 +244,7 @@ struct
 			          let val {exp=exp1,ty=ty1} = trvar var in
 			              case ty1 of
 			               T.RECORD(tylist,_) =>
-			                 (case List.find (fn x => (#1 x) = id) tylist of
+			                 (case List.find (fn x => (#1 x) = sym) tylist of
 			                    NONE => (err pos ("id: " ^ S.name sym ^ " not found");
 			                      {exp=(),ty=T.NIL})
 			                  | SOME(ft) =>  {exp=(), ty=actual_ty(#2 ft,pos)})
