@@ -274,25 +274,35 @@ struct
 	
 	
 	
-    and fun transDec (venv, tenv, A.VarDec{name,type = NONE,init,...}) = 
+    and fun transDec (venv, tenv, A.VarDec{name,type = NONE,init, pos, ...}) = 
         let val {exp, ty} = transExp (venv, tenv, init)
         in {tenv = tenv, venv = S.enter(venv, name, E.VarEntry{ty = ty})}
         end
 
-    | transDec (venv, tenv, A.VarDec{name,type = SOME (type_id, _),init,...}) =
-        (case Symbol.look(tenv, typy_id) of
-         NONE    => (error pos "unknown type"; {venv = venv, tenv = tenv})
-         SOME ty => {tenv = tenv, venv = S.enter(venv, name, E.VarEntry(access=(), ty=ty))})
+    | transDec (venv, tenv, A.VarDec{name,type = SOME (type_id, _),init, pos,...}) =
+        let val {exp, ty} = transExp (venv, tenv, init)
+        in (case Symbol.look(tenv, typy_id) of
+            NONE    => (error pos "unknown type"; 
+                       {venv=S.enter(venv, name, E.VarEntry{access=(), ty=ty})
+            SOME dataty => 
+                let
+                    val dataty' = actual_ty(dataty, ty, pos)
+                in
+                    checkTypeSame(dataty, ty, pos)
+                    {tenv = tenv, venv = S.enter(venv, name, E.VarEntry(access=(), ty=ty))})
+                end
+        end
 
 	| transDec (venv, tenv, A.TypeDec(tydecs) = 
-	 	let val tenv' = List.foldr (fn(ty, env) => S.enter (env, #name ty, T.NAME (#name ty, ref NONE))) tenv tydecs
-	 	in {venv = venv, 
-	 	    tenv = List.foldr(fn(ty, env) => 
+	 	let val tenv' = List.foldr (fn(ty, env) => 
+	 	                S.enter (env, #name ty, T.NAME (#name ty, ref NONE))) tenv tydecs
+	 	    val tenv'' = List.foldr(fn(ty, env) => 
 	 	    Symbol.enter(env, #name ty, transTy(env, ty))) tenv' tydecs
-	 	    }
+
+	 	in {venv = venv, tenv = tenv''}
 	 
 	| transDec(venv, tenv, A.FunctionDec(fundecs)) = 
-	 	let venv' = List.foldr(fn(dec, env) => Symbol.enter(env, #name dec, functionHeader(tenv, dec))) venv fundecs
+	 	let venv' = List.foldr(fn(dec, env) => Symbol.enter(env, #name dec, transHeader(tenv, dec))) venv fundecs
 	 	    fun runDec dec = 
 	 	        case Symbol.look(venv', #name dec) of
 	 	            NONE => ErrorMsg.impossible "No header found"
@@ -303,14 +313,7 @@ struct
 	 	    {venv = venv', tenv = tenv}
 	 	end	
 
-    | transDec (venv, tenv, []) = {venv=venv, tenv=tenv}
-
-	| transDec (venv, tenv, dec::decs) = 
-	    let val {tenv=tenv', venv=venv'} = transDec(venv, tenv, dec)
-	    in transDecs(venv', tenv', decs)
-	    end
-
-	and functionHeader(tenv, {name, params, result, body, pos}) =
+	and transHeader(tenv, {name, params, result, body, pos}) =
 	    let val params' = List.map #ty (List.map (transParam tenv) params)
 	    in
 	        (case result of
