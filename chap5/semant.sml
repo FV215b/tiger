@@ -33,7 +33,14 @@ struct
         then ()
         else (error pos "string required")
 
-    fun actual_ty ty = (* need implement *)
+  fun actual_ty (ty:T.ty,pos) =
+      case ty of
+        T.NAME(sym,tyref) =>
+        (case (!tyref) of
+           NONE => (err pos ("type undefined: " ^ S.name(sym)); T.NIL)
+         | SOME(ty) => actual_ty (ty,pos))
+      | T.ARRAY(t,u) => T.ARRAY(actual_ty(t,pos),u)
+    | _ => ty
 
     fun transExp(venv,tenv) = 
         let fun trexp (A.OpExp{left, oper = A.PlusOp,right,pos}) = 
