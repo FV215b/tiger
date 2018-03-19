@@ -351,6 +351,16 @@ struct
 	                 {name = name, ty = T.NIL})
 	      | SOME ty =>
 	            {name=name, ty=ty}
+	            
+	            
+	fun transProg(exp:Absyn.exp) =
+    let
+      val {exp,ty} =
+          transExp (E.base_venv,E.base_tenv)(exp)
+    in
+      ()
+    end
+
 end
 
 	 	
