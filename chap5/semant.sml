@@ -135,7 +135,7 @@ struct
  		      | trexp (A.RecordExp {fields,typ, pos}) = 
  		        case S.look(tenv,typ) of 
  		          NONE => 
- 		          (err pos ("record type " ^ S.name typ ^ " not found");
+ 		          (err pos ("record type " ^ S.name typ ^ " not found");{exp = (); ty=T.UNIT})
  		        | SOME(t) => 
  		          case actual_ty(t,pos) of 
  		            T.RECORD(tlist,u) => 
@@ -147,7 +147,7 @@ struct
               			checkParaList(ttlist,fts,pos);
              			 {exp=(),ty=T.RECORD(tlist,u)}
            			 end
-           		  | _ =>  err pos ("expected record type, but " ^ type2string(actual_ty(t,pos)) ^ " found"); 
+           		  | _ =>  (err pos ("expected record type, but " ^ type2string(actual_ty(t,pos)) ^ " found");{exp = (); ty=T.UNIT})
 			
 			 | trexp(A.SeqExp(exps)) =
           		let val ty = case exps of [] => T.UNIT
@@ -164,24 +164,116 @@ struct
           			 {exp=(),ty=T.UNIT})
                 end
 
-			 | trexp trexp (A.IfExp{test, then', else', pos}) =
+			 | trexp (A.IfExp{test, then', else', pos}) =
       			  (checkInt(#ty (trexp test));
-      			   if isSome(else') then checkTypeSame(#ty (trexp then'), #ty (trexp (valOf else')),pos)
+      			   if isSome(else') then checkTypeSame(#ty (trexp then'), #ty (trexp (valOf else')),pos) 
       			   else checkTypeSame(#ty (trexp then'),T.UNIT,pos); {exp = (); ty = #ty (trexp then')}
 
 
-			 | 
+			 | trexp (A.WhileExp{test,body,pos}) =
+      	   	    let
+                    val {exp=test_exp,ty=test_ty} = trexp test
+                    val {exp=body_exp,ty=body_ty} = transExp(venv,tenv) body
+     		    in
+      			    checkInt(test_ty,pos);
+          			checkTypeSame(body_ty,T.UNIT,pos);
+        		    {exp=(),ty=T.UNIT}
+                end
+                
+			 | trexp (A.BreakExp(_)) = {exp=(),ty=T.UNIT}
 			 
+			 | trexp ( trexp (A.ArrayExp{typ,size,init,pos}) =
+			     case S.look(tenv,typ) of
+			       NONE => err pos ("type " ^ S.name(typ) ^ " not found"; {exp = (), ty = T.UNIT})
+			     | SOME(t) =>
+			         let val at = actual_ty(t,pos) in
+			              case at of
+			                T.ARRAY(tt,_) =>
+			                let val {exp=size_exp,ty=size_ty} = trexp size
+			                    val {exp=init_exp,ty=init_ty} = trexp init
+			                in
+			                  checkInt(size_ty,pos);
+			                  checkTypeSame(tt,init_ty,pos);
+			                  {exp=(),ty=at}
+			                end
+			              |_ => (err pos "expected Array type, but " ^ type2string(at) ^ " found" ;{exp = (), ty = T.UNIT})
+           			 end
+			 
+			 | trexp (A.ForExp{var,escape,lo,hi,body,pos}) =
+			 	 case S.look(tenv,var) of 
+			 	   NONE => err pos ("type " ^ S.name(var) ^ " not found";{exp = (), ty = T.UNIT})
+			 	 | SOME(t) =>
+			 	 	 let val at = actual_ty(t,pos) in 
+			 	 	 	 case at of 
+			 	 	 	 T.INT => 
+			 	 	 	 let val {exp=lo_exp,ty=lo_ty} = trexp lo
+			 	 	 	     val {exp=hi_exp,ty=hi_ty} = trexp hi
+			 	 	 	     val {exp=body_exp,ty=body_ty} = trexp body
+			 	 	 	 in
+			 	 	 	     checkInt (lo_ty,pos);
+			 	 	 	     checkInt (hi_ty,pos);
+			 	 	 	     checkTypeSame (body_ty,T.UNIT,pos);
+			 	 	 	     {exp = (), ty = T.UNIT}
+			 	 	 	 end
+			 	 	     | _ => (err pos "expected Int type as for id, but " ^ type2string(at) ^ " found";{exp = (), ty = T.UNIT})
+			 	 	 end
+			 	 	 
+			 | trexp (A.CallExp{func,args,pos}) =
+			     case S.look(venv,func) of
+			       NONE => (err pos ("function " ^ S.name(func) ^ " is not defined");
+			            {exp = (), ty = T.UNIT})
+			     | SOME(E.VarEntry{access,ty}) =>
+			           (err pos ("function expected, but variable of type: "
+			                     ^ type2string(ty) ^ " found"); {exp = (), ty = T.UNIT})
+			     | SOME(E.FunEntry{level=funlevel,label,formals,result}) =>
+			           let
+			             val argtypelist = map trexp args 
+			           in
+			             checkParaList(argtypelist,formals,pos);
+			             {exp=(),
+			              ty=actual_ty(result,pos)}
+                       end
+			 	 	 	     
  		    and fun trvar (A.SimpleVar(id, pos)) = 
  		        (case S.look(venv,id)
  			        of SOME(E.VarEntry{ty}) => {exp=(), ty = actual_ty ty}
  			        |  NONE                 => (error pos ("undefined variable "^ S.name id);
  			    )
- 		        | trvar (A.FieldVar(v,id,pos)) = (* FunEntry at here? *)
+ 			    
+ 		          | trvar (A.FieldVar(var,sym,pos)) =
+			          let val {exp=exp1,ty=ty1} = trvar var in
+			              case ty1 of
+			               T.RECORD(tylist,_) =>
+			                 (case List.find (fn x => (#1 x) = id) tylist of
+			                    NONE => (err pos ("id: " ^ S.name sym ^ " not found");
+			                      {exp=(),ty=T.NIL})
+			                  | SOME(ft) =>  {exp=(), ty=actual_ty(#2 ft,pos)})
+			                  
+			               | _ => (err pos ("expected record type, but "
+			                             ^ type2string(ty1) ^ " found"); {exp=(),ty=T.NIL})
+			               end
+			   
+			      | trvar (A.SubscriptVar(var,exp,pos)) =
+			          let val {exp = var_exp,ty = var_ty} = trvar var in
+			              case actual_ty(var_ty,pos) of
+			                T.ARRAY(t,_) =>
+			               let val {exp=exp_exp,ty=exp_ty} = trexp exp in
+			                     case exp_ty of
+			                       T.INT => {exp=(),ty=t}
+			                       | _ =>
+			                         (err pos ("array subscript should be int, but "
+			                                 ^ type2string(exp_ty) ^ " found"); {exp=(),ty=T.UNIT})
+			                      end
+			              | _ => (err pos ("array required, but "
+			                                 ^ type2string(actual_ty(var_ty,pos)) ^ " found"); {exp=(),ty=T.UNIT})
+                      end
  		in 
  		    trexp
         end
-
+	
+	
+	
+	
     and fun transDec (venv, tenv, A.VarDec{name,type = NONE,init,...}) = 
         let val {exp, ty} = transExp (venv, tenv, init)
         in {tenv = tenv, venv = S.enter(venv, name, E.VarEntry{ty = ty})}
