@@ -1,4 +1,4 @@
-structure Semant : 
+structure Semant: 
 sig
     type expty
     type venv
@@ -14,7 +14,7 @@ struct
     structure A = Absyn
     structure T = Types
     structure S = Symbol
-
+    structure E = Env
     structure Tr = Translate
 
     type expty =  {exp:Tr.exp, ty: T.ty}
@@ -181,30 +181,81 @@ struct
  		in 
  		    trexp
         end
- 
+
     and fun transDec (venv, tenv, A.VarDec{name,type = NONE,init,...}) = 
-        let val {exp,ty} = transExp (venv,tenv,init)
-            in {tenv = tenv,
-            venv = S.enter(venv,name,E.VarEntry{ty=ty})}
-        end (* recursive, only var x := exp, need more check at var x : type-id := exp *)
+        let val {exp, ty} = transExp (venv, tenv, init)
+        in {tenv = tenv, venv = S.enter(venv, name, E.VarEntry{ty = ty})}
+        end
+
+    | transDec (venv, tenv, A.VarDec{name,type = SOME (type_id, _),init,...}) =
+        (case Symbol.look(tenv, typy_id) of
+         NONE    => (error pos "unknown type"; {venv = venv, tenv = tenv})
+         SOME ty => {tenv = tenv, venv = S.enter(venv, name, E.VarEntry(access=(), ty=ty))})
+
+	| transDec (venv, tenv, A.TypeDec(tydecs) = 
+	 	let val tenv' = List.foldr (fn(ty, env) => S.enter (env, #name ty, T.NAME (#name ty, ref NONE))) tenv tydecs
+	 	in {venv = venv, 
+	 	    tenv = List.foldr(fn(ty, env) => 
+	 	    Symbol.enter(env, #name ty, transTy(env, ty))) tenv' tydecs
+	 	    }
 	 
-	| transDec (venv, tenv, A.TypeDec[{name,ty}]) = 
-	 	{venv=venv,tenv=S.enter(tenv,name,transTy(tenv,ty))}
-	    (* only handles type-declaration list of length 1 *)
-	 
-	| transDec(venv, tenv, A.FunctionDec[{name,params,body,pos,result = SOME(rt,pos)}]) = 
-	 	let val SOME(result_ty) = S.look(tenv,rt)
-	        fun transparam{name,typ,pos} = 
-	 			case S.look(tenv,typ)
-	 			of SOME t => {name=name,ty=t}
-	 		val params' = map transparam params
-	 		val venv' = S.enter(venv,name, E.FunEntry{formals=map #ty params',result = result_ty})
-	 		fun enterparam ({name,ty},venv) = S.enter(venv,name,E.VarEntry{access=(),ty=ty})
-	 		val venv'' = fold entergaram params' venv'
-	 	in transExp (venv'',tenv) body;
-	 		{venv=venv',tenv=tenv}
-	 	end
-	        (* recursive *)		
+	| transDec(venv, tenv, A.FunctionDec(fundecs)) = 
+	 	let venv' = List.foldr(fn(dec, env) => Symbol.enter(env, #name dec, functionHeader(tenv, dec))) venv fundecs
+	 	    fun runDec dec = 
+	 	        case Symbol.look(venv', #name dec) of
+	 	            NONE => ErrorMsg.impossible "No header found"
+	 	          | SOME(Env.FunEntry entry) => transFun(venv', tenv, entry, dec)
+	 	          | _ => ErrorMsg.impossible "Not function header"
+
+	 	in List.map runDec decs;
+	 	    {venv = venv', tenv = tenv}
+	 	end	
+
+    | transDec (venv, tenv, []) = {venv=venv, tenv=tenv}
+
+	| transDec (venv, tenv, dec::decs) = 
+	    let val {tenv=tenv', venv=venv'} = transDec(venv, tenv, dec)
+	    in transDecs(venv', tenv', decs)
+	    end
+
+	and functionHeader(tenv, {name, params, result, body, pos}) =
+	    let val params' = List.map #ty (List.map (transParam tenv) params)
+	    in
+	        (case result of
+	        SOME (sym, pos) =>
+	            (case Symbol.look(tenv, sym) of
+	            NONE => (error pos "unkown type";
+	            E.FunEntry{formals=params', result=T.UNIT})
+	          | SOME => resTy => E.FunEntry {formals=params', result=resTy} 
+	            )
+	      | NONE => Env.FunEntry{formals = params', result = T.UNIT}
+	        )
+	    end
+
+	and transFun(venv, tenv, entry, {name, params, result = SOME(result, resultPos), body, pos})=
+	    (case result of 
+	        SOME (result, resultPos) =>
+	            (case Symbol.look (tenv, result) of
+	                NONE => (error resultPos "unkown result type")
+	              | SOME resultTy =>
+	                    let val params' = List.map (transParam tenv) params
+	                        fun addparam ({name, ty}, env) = 
+	                            Symbol.enter(env, name, E.VarEntry {access=(), ty=ty})
+	                        val venv' = List.foldr addparam venv params'
+	                        val expResult = transExp(venv', tenv) body
+	                    in
+	                        checkTypeSame(resultTy, #ty expResult,pos)
+	                    end
+	            )
+	      | NONE => ()
+	    )
+
+	and transParam(tenv, {name, typ = typSym, pos}) = 
+	    case Symbol.look (tenv, typSym) of
+	        NONE => (error pos "undefined paramter type"; 
+	                 {name = name, ty = T.NIL})
+	      | SOME ty =>
+	            {name=name, ty=ty}
 end
 
 	 	
