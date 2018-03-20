@@ -76,27 +76,13 @@ struct
         else (err pos "string required")
     end
 
-    fun checkArray( ty, pos) = 
-    let val t = actual_ty (ty, pos) in
-    	if t = T.ARRAY ()
-    	then ()
-    	else (err pos " array required")
-    end
-
-    fun checkRecord( ty , pos) =
-    let val t = actual_ty (ty, pos) in
-     	if t = T.RECORD
-     	then ()
-     	else (err pos " record required")
-    end
-        
     fun checkEqual (lt,rt,pos) =
     let val alt = actual_ty (lt, pos) in
    		case alt of 
    		  T.INT => checkInt (rt, pos)
    		| T.STRING => checkString (rt,pos)
-   		| T.ARRAY => checkArray (rt,pos)
-   		| T.RECORD => checkRecord(rt, pos)
+   		| T.ARRAY(t,u) => checkTypeSame (rt,T.ARRAY(t,u),pos)
+   		| T.RECORD(sym,ty) => checkTypeSame(rt,T.RECORD(sym,ty), pos)
    		| _ => (err pos ("can only check equality on "
                       ^ "int, string, array or record types,"))
     end
@@ -120,10 +106,10 @@ struct
           	  
                   | trexp (A.OpExp{lt, oper ,rt,pos}) = 
  				    (case oper of 
- 				      A.PlusOp => (checkint(lt,pos); checkint(rt,pos); {exp=(),ty=T.INT})
-				    | A.MinusOp => (checkint(lt,pos); checkint(rt,pos); {exp=(),ty=T.INT})
-					| A.TimesOp => (checkint(lt,pos); checkint(rt,pos); {exp=(),ty=T.INT})
-					| A.DivideOp => (checkint(lt,pos); checkint(rt,pos); {exp=(),ty=T.INT})
+ 				      A.PlusOp => (checkInt(lt,pos); checkInt(rt,pos); {exp=(),ty=T.INT})
+				    | A.MinusOp => (checkInt(lt,pos); checkInt(rt,pos); {exp=(),ty=T.INT})
+					| A.TimesOp => (checkInt(lt,pos); checkInt(rt,pos); {exp=(),ty=T.INT})
+					| A.DivideOp => (checkInt(lt,pos); checkInt(rt,pos); {exp=(),ty=T.INT})
 					| A.LtOp => (checkCompare(lt,rt,pos); {exp=(),ty= actual_ty (lt,pos)})
 					| A.GtOp => (checkCompare(lt,rt,pos); {exp=(),ty= actual_ty (lt,pos)})
 					| A.LeOp => (checkCompare(lt,rt,pos); {exp=(),ty= actual_ty (lt,pos)})
