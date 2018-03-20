@@ -23,6 +23,11 @@ struct
 
     val err = ErrorMsg.error
     
+    fun checkdup (nil,nil) = ()
+	  | checkdup (n::nr, p::pr) =
+	    if (List.all (fn (x) => (n <> x)) nr) then checkdup(nr,p)
+    else err pos ("duplicated definition: " ^ S.name n)
+
     fun type2string (ty:T.ty) = 
           case ty of 
 		      T.NIL => "nil"
