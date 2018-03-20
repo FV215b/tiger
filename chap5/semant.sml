@@ -96,7 +96,7 @@ struct
     let val alt = actual_ty (lt ,pos) in 
     	case alt of
     	  T.INT => checkInt (rt, pos)
-    	| T.SRTING => checkString(rt, pos)
+    	| T.STRING => checkString(rt, pos)
     	| _ => (err pos ("can only compare int or string "))
     end
 
