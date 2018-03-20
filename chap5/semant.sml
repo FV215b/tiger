@@ -109,7 +109,10 @@ struct
               
           	  | trexp (A.StringExp(s,_)) = {exp=(),ty=T.STRING}
           	  
-                  | trexp (A.OpExp{lt, oper ,pos, rt}) = 
+                  | trexp (A.OpExp{left, oper ,right, pos}) = 
+                  let  val {exp,ty=lt} = trexp left
+          			   val {exp,ty=rt} = trexp right
+          		  in
  				    (case oper of 
  				      A.PlusOp => (checkInt(lt,pos); checkInt(rt,pos); {exp=(),ty=T.INT})
 				    | A.MinusOp => (checkInt(lt,pos); checkInt(rt,pos); {exp=(),ty=T.INT})
