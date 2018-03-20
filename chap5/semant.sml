@@ -25,8 +25,8 @@ struct
     
     fun checkdup (nil,nil) = ()
 	  | checkdup (n::nr, p::pr) =
-	    if (List.all (fn (x) => (n <> x)) nr) then checkdup(nr,p)
-    else err pos ("duplicated definition: " ^ S.name n)
+	    if (List.all (fn (x) => (n <> x)) nr) then checkdup(nr,pr)
+    else err p ("duplicated definition: " ^ S.name n)
 
     fun type2string (ty:T.ty) = 
           case ty of 
@@ -109,7 +109,7 @@ struct
               
           	  | trexp (A.StringExp(s,_)) = {exp=(),ty=T.STRING}
           	  
-                  | trexp (A.OpExp{lt, oper ,rt,pos}) = 
+                  | trexp (A.OpExp{lt, oper ,pos, rt}) = 
  				    (case oper of 
  				      A.PlusOp => (checkInt(lt,pos); checkInt(rt,pos); {exp=(),ty=T.INT})
 				    | A.MinusOp => (checkInt(lt,pos); checkInt(rt,pos); {exp=(),ty=T.INT})
@@ -124,7 +124,7 @@ struct
  				     
  		      | trexp (A.LetExp{decs,body,pos}) = 
  		            let val {venv = venv', tenv = tenv' } = 
- 		                     transDecs(venv,tenv,decs)
+ 		                     transDec(venv,tenv,decs)
  		            in transExp(venv',tenv') body
  		            end
  		            
@@ -282,15 +282,15 @@ struct
 
     | transDec (venv, tenv, A.VarDec{name,escape,typ = SOME (type_id, _),init, pos}) =
         let val {exp, ty} = transExp (venv, tenv, init)
-        in (case Symbol.look(tenv, typy_id) of
+        in (case Symbol.look(tenv, type_id) of
             NONE    => (err pos "unknown type"; 
-                       {venv=S.enter(venv, name, E.VarEntry{access=(), ty=ty})})
+                       {venv=S.enter(venv, name, E.VarEntry{ty=ty})})
           | SOME dataty => 
                 let
                     val dataty' = actual_ty(dataty, ty, pos)
                 in
                     checkTypeSame(dataty, ty, pos)
-                    {tenv = tenv, venv = S.enter(venv, name, E.VarEntry(access=(), ty=ty))}
+                    {tenv = tenv, venv = S.enter(venv, name, E.VarEntry(ty=ty))}
                 end)
         end
 
@@ -311,7 +311,7 @@ struct
 	 	          | SOME(Env.FunEntry entry) => transFun(venv', tenv, entry, dec)
 	 	          | _ => ErrorMsg.impossible "Not function header"
 
-	 	in List.map runDec decs;
+	 	in List.map runDec fundecs;
 	 	    {venv = venv', tenv = tenv}
 	 	end	
 
