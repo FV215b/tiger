@@ -17,10 +17,11 @@ struct
     structure Tr = Translate
 
     type expty =  {exp:Tr.exp, ty: T.ty}
-    type venv = Env.base_venv
-    type tenv = Env.base_tenv
+    
+    type venv = Env.enventry Symbol.table
+    type tenv = Env.ty Symbol.table
 
-    val error = ErrorMsg.error
+    val err = ErrorMsg.error
     
     fun type2string (ty:T.ty) = 
           case ty of 
@@ -28,7 +29,7 @@ struct
 		    | T.UNIT => "unit"
 			| T.INT => "int"
 			| T.STRING => "string"
-			| T.ARRAY(t,_) => "array of " ^ type2str(t)
+			| T.ARRAY(t,_) => "array of " ^ type2string(t)
 			| T.NAME(sym,_) => "name of " ^ S.name(sym)
     		| T.RECORD(_,_) => "record"
       		     
@@ -65,28 +66,28 @@ struct
     in
         if t = T.INT 
         then ()
-        else (error pos "interger required")
+        else (err pos "interger required")
     end
 
     fun checkString( ty , pos) = 
     let val t = actual_ty (ty, pos) in
         if t = T.STRING 
         then ()
-        else (error pos "string required")
+        else (err pos "string required")
     end
 
     fun checkArray( ty, pos) = 
     let val t = actual_ty (ty, pos) in
-    	if t = T.ARRAY
+    	if t = T.ARRAY ()
     	then ()
-    	else (error pos " array required")
+    	else (err pos " array required")
     end
 
     fun checkRecord( ty , pos) =
     let val t = actual_ty (ty, pos) in
      	if t = T.RECORD
      	then ()
-     	else (error pos " record required")
+     	else (err pos " record required")
     end
         
     fun checkEqual (lt,rt,pos) =
@@ -246,7 +247,7 @@ struct
  		    and trvar (A.SimpleVar(id, pos)) = 
  		        (case S.look(venv,id)
  			        of SOME(E.VarEntry{ty}) => {exp=(), ty = actual_ty ty}
- 			        |  NONE                 => (error pos ("undefined variable "^ S.name id);{exp=(), ty = T.UNIT})
+ 			        |  NONE                 => (err pos ("undefined variable "^ S.name id);{exp=(), ty = T.UNIT})
  			    )
  			    
  		          | trvar (A.FieldVar(var,sym,pos)) =
@@ -291,7 +292,7 @@ struct
     | transDec (venv, tenv, A.VarDec{name,escape,typ = SOME (type_id, _),init, pos}) =
         let val {exp, ty} = transExp (venv, tenv, init)
         in (case Symbol.look(tenv, typy_id) of
-            NONE    => (error pos "unknown type"; 
+            NONE    => (err pos "unknown type"; 
                        {venv=S.enter(venv, name, E.VarEntry{access=(), ty=ty})})
           | SOME dataty => 
                 let
@@ -329,7 +330,7 @@ struct
 	        (case result of
 	        SOME (sym, pos) =>
 	            (case Symbol.look(tenv, sym) of
-	            NONE => (error pos "unkown type";
+	            NONE => (err pos "unkown type";
 	            E.FunEntry{formals=params', result=T.UNIT})
 	          | SOME (resTy) => E.FunEntry {formals=params', result=resTy} 
 	            )
@@ -341,7 +342,7 @@ struct
 	    (case result of 
 	        SOME (result, resultPos) =>
 	            (case Symbol.look (tenv, result) of
-	                NONE => (error resultPos "unkown result type")
+	                NONE => (err resultPos "unkown result type")
 	              | SOME resultTy =>
 	                    let val params' = List.map (transParam tenv) params
 	                        fun addparam ({name, ty}, env) = 
@@ -357,7 +358,7 @@ struct
 
 	and transParam(tenv, {name, typ = typSym, pos}) = 
 	    case Symbol.look (tenv, typSym) of
-	        NONE => (error pos "undefined paramter type"; 
+	        NONE => (err pos "undefined paramter type"; 
 	                 {name = name, ty = T.NIL})
 	      | SOME ty =>
 	            {name=name, ty=ty}
