@@ -159,6 +159,7 @@ struct
                                              (case List.last exps of 
           		                         (exp,pos) => #ty (trexp exp)
           		                         ))
+          		    val seqex = map (fn (exp,pos) => #ex (trexp exp)) exps
        			 in {exp=(),ty=ty} end
        			 
        		 | trexp (A.AssignExp{var,exp,pos}) =
