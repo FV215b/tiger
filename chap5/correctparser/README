@@ -1,0 +1,5 @@
+For compile and test, use following command:
+CM.make "sources.cm";
+Main.main "test.tig";
+
+The typer checker may not works correctly. However, this might due to the incorrectly absyn tree in last phase. If possible, please use the correct "parse.sml" for testing.
