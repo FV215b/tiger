@@ -2,11 +2,9 @@ structure Semant:
 sig
     type expty
     type venv
-    type tenv 
-
-    val transExp: venv * tenv * Absyn.exp -> expty
-    val transDec: venv * tenv * Absyn.dec -> {venv: venv, tenv: tenv}
-    val transTy: tenv* Absyn.ty -> Types.ty
+    type tenv
+    
+    val transProg: Absyn.exp -> unit 
 end = 
 
 struct
@@ -25,8 +23,9 @@ struct
     
     fun checkdup (nil,nil) = ()
 	  | checkdup (n::nr, p::pr) =
-	    if (List.all (fn (x) => (n <> x)) nr) then checkdup(nr,pr)
-    else err p ("duplicated definition: " ^ S.name n)
+	    (if (List.all (fn (x) => (n <> x)) nr) then checkdup(nr,pr)
+            else err p ("duplicated definition: " ^ S.name n))
+          | checkdup (_,_) = ()
 
     fun type2string (ty:T.ty) = 
           case ty of 
@@ -65,7 +64,8 @@ struct
          case (explist,tylist,pos) of 
             ([],[],pos) => ()
           | (a1::l1,a2::l2,pos) => (checkTypeSame (a1,a2,pos);checkParaList(l1,l2,pos))
-            
+          | _ => err pos (Int.toString(length(tylist)) ^ " fields needed, but "^ Int.toString(length(explist)) ^ " given")
+
     fun checkInt( ty, pos) = 
     let val t = actual_ty (ty, pos) 
     in
@@ -124,10 +124,11 @@ struct
 					| A.GeOp => (checkCompare(lt,rt,pos); {exp=(),ty= actual_ty (lt,pos)})
 					| A.EqOp => (checkEqual(lt,rt,pos); {exp=(),ty= actual_ty (lt,pos)})
               		| A.NeqOp => (checkEqual(lt,rt,pos); {exp=(),ty= actual_ty (lt,pos)}))
+                        end
  				     
  		      | trexp (A.LetExp{decs,body,pos}) = 
  		            let val {venv = venv', tenv = tenv' } = 
- 		                     transDec(venv,tenv,decs)
+ 		                     transDecs(venv,tenv,decs)
  		            in transExp(venv',tenv') body
  		            end
  		            
@@ -141,7 +142,7 @@ struct
           			  let
           			    val ttlist = map (fn (sym,ty) => ty) tlist
           			    val fds = map (fn (a,b,pos) => (trexp b,pos)) fields
-          			    val fts = map (fn ({e,t},pos) => (t,pos)) fds
+          			    val fts = map (fn ({exp,ty},pos) => ty) fds
            			 in
               			checkParaList(ttlist,fts,pos);
              			 {exp=(),ty=T.RECORD(tlist,u)}
@@ -156,8 +157,8 @@ struct
                             (case exps of [] => T.UNIT
           		                 | _ =>
                                              (case List.last exps of 
-          		                         (exp,pos) => #ty trexp exp
-          		                         | _ => T.UNIT))
+          		                         (exp,pos) => #ty (trexp exp)
+          		                         ))
        			 in {exp=(),ty=ty} end
        			 
        		 | trexp (A.AssignExp{var,exp,pos}) =
@@ -169,7 +170,7 @@ struct
                 end
 
 			 | trexp (A.IfExp{test, then', else', pos}) =
-      			  (checkInt(#ty (trexp test));
+     			  (checkInt(#ty (trexp test),pos);
       			   if isSome(else') then checkTypeSame(#ty (trexp then'), #ty (trexp (valOf else')),pos) 
       			   else checkTypeSame(#ty (trexp then'),T.UNIT,pos); {exp = (), ty = #ty (trexp then')})
 
@@ -188,7 +189,7 @@ struct
 			 
 			 | trexp (A.ArrayExp{typ,size,init,pos}) =
 			     (case S.look(tenv,typ) of
-			       NONE => err pos ("type " ^ S.name(typ) ^ " not found"; {exp = (), ty = T.UNIT})
+			       NONE => (err pos ("type " ^ S.name(typ) ^ " not found"); {exp = (), ty = T.UNIT})
 			     | SOME(t) =>
 			         let val at = actual_ty(t,pos) in
 			              case at of
@@ -200,12 +201,12 @@ struct
 			                  checkTypeSame(tt,init_ty,pos);
 			                  {exp=(),ty=at}
 			                end
-			              |_ => (err pos "expected Array type, but " ^ type2string(at) ^ " found" ;{exp = (), ty = T.UNIT})
+			              |_ => (err pos ("expected Array type, but " ^ type2string(at) ^ " found" );{exp = (), ty = T.UNIT})
            			 end)
 			 
 			 | trexp (A.ForExp{var,escape,lo,hi,body,pos}) =
 			 	 (case S.look(tenv,var) of 
-			 	   NONE => err pos ("type " ^ S.name(var) ^ " not found";{exp = (), ty = T.UNIT})
+			 	   NONE => (err pos ("type " ^ S.name(var) ^ " not found");{exp = (), ty = T.UNIT})
 			 	 | SOME(t) =>
 			 	 	 let val at = actual_ty(t,pos) in 
 			 	 	 	 case at of 
@@ -219,29 +220,30 @@ struct
 			 	 	 	     checkTypeSame (body_ty,T.UNIT,pos);
 			 	 	 	     {exp = (), ty = T.UNIT}
 			 	 	 	 end
-			                        | _ => (err pos "expected Int type as for id, but " ^ type2string(at) ^ " found";{exp = (), ty = T.UNIT})
+			                        | _ => (err pos ("expected Int type as for id, but " ^ type2string(at) ^ " found");{exp = (), ty = T.UNIT})
 			 	 	 end)
 			 	 	 
 			 | trexp (A.CallExp{func,args,pos}) =
 			     case S.look(venv,func) of
 			       NONE => (err pos ("function " ^ S.name(func) ^ " is not defined");
 			            {exp = (), ty = T.UNIT})
-			     | SOME(E.VarEntry{access,ty}) =>
+			     | SOME(E.VarEntry{ty}) =>
 			           (err pos ("function expected, but variable of type: "
 			                     ^ type2string(ty) ^ " found"); {exp = (), ty = T.UNIT})
-			     | SOME(E.FunEntry{level=funlevel,label,formals,result}) =>
+			     | SOME(E.FunEntry{formals,result}) =>
 			           let
 			             val argtypelist = map trexp args 
 			           in
-			             checkParaList(argtypelist,formals,pos);
+			             checkParaList(map #ty argtypelist,formals,pos);
 			             {exp=(),
 			              ty=actual_ty(result,pos)}
                        end
 			 	 	 	     
  		    and trvar (A.SimpleVar(id, pos)) = 
  		        (case S.look(venv,id)
- 			        of SOME(E.VarEntry{ty}) => {exp=(), ty = actual_ty ty}
+ 			        of SOME(E.VarEntry{ty}) => {exp=(), ty = actual_ty (ty,pos)}
  			        |  NONE                 => (err pos ("undefined variable "^ S.name id);{exp=(), ty = T.UNIT})
+                                | _ => (err pos ("undefined type "^ S.name id);{exp=(), ty = T.UNIT})
  			    )
  			    
  		          | trvar (A.FieldVar(var,sym,pos)) =
@@ -279,21 +281,21 @@ struct
 	
 	
     and transDec (venv, tenv, A.VarDec{name,escape, typ = NONE,init, pos}) = 
-        let val {exp, ty} = transExp (venv, tenv, init)
+        let val {exp, ty} = transExp (venv, tenv) init
         in {tenv = tenv, venv = S.enter(venv, name, E.VarEntry{ty = ty})}
         end
 
     | transDec (venv, tenv, A.VarDec{name,escape,typ = SOME (type_id, _),init, pos}) =
-        let val {exp, ty} = transExp (venv, tenv, init)
+        let val {exp, ty} = transExp (venv, tenv) init
         in (case Symbol.look(tenv, type_id) of
             NONE    => (err pos "unknown type"; 
-                       {venv=S.enter(venv, name, E.VarEntry{ty=ty})})
+                       {tenv=tenv, venv=S.enter(venv, name, E.VarEntry{ty=ty})})
           | SOME dataty => 
                 let
-                    val dataty' = actual_ty(dataty, ty, pos)
+                    val dataty' = actual_ty(dataty, pos)
                 in
-                    checkTypeSame(dataty, ty, pos)
-                    {tenv = tenv, venv = S.enter(venv, name, E.VarEntry(ty=ty))}
+                    checkTypeSame(dataty, ty, pos);
+                    {tenv = tenv, venv = S.enter(venv, name, E.VarEntry{ty=ty})}
                 end)
         end
 
@@ -301,7 +303,7 @@ struct
 	 	let val tenv' = List.foldr (fn(ty, env) => 
 	 	                S.enter (env, #name ty, T.NAME (#name ty, ref NONE))) tenv tydecs
 	 	    val tenv'' = List.foldr(fn(ty, env) => 
-	 	    Symbol.enter(env, #name ty, transTy(env, ty))) tenv' tydecs
+	 	    S.enter(env, #name ty, transTy(env, #ty ty))) tenv' tydecs
 
 	 	in {venv = venv, tenv = tenv''}
                 end
@@ -316,8 +318,13 @@ struct
 
 	 	in List.map runDec fundecs;
 	 	    {venv = venv', tenv = tenv}
-	 	end	
+	 	end
 
+        and transDecs(venv, tenv, []) = {venv=venv, tenv=tenv}
+           | transDecs(venv, tenv, dec::decs) =
+               let val {tenv=tenv', venv=venv'} = transDec(venv, tenv, dec)
+               in transDecs(venv', tenv', decs)
+               end
 	and transHeader(tenv, {name, params, result, body, pos}) =
 	    let val params' = List.map #ty (List.map (transParam tenv) params)
 	    in
@@ -332,15 +339,15 @@ struct
 	        )
 	    end
 
-	and transFun(venv, tenv, entry, {name, params, result = SOME(result, resultPos), body, pos})=
+	and transFun(venv, tenv, entry, {name, params, result, body, pos})=
 	    (case result of 
-	        SOME (result, resultPos) =>
-	            (case Symbol.look (tenv, result) of
+	        SOME (res, resultPos) =>
+	            (case Symbol.look (tenv, res) of
 	                NONE => (err resultPos "unkown result type")
 	              | SOME resultTy =>
 	                    let val params' = List.map (transParam tenv) params
 	                        fun addparam ({name, ty}, env) = 
-	                            Symbol.enter(env, name, E.VarEntry {access=(), ty=ty})
+	                            Symbol.enter(env, name, E.VarEntry {ty=ty})
 	                        val venv' = List.foldr addparam venv params'
 	                        val expResult = transExp(venv', tenv) body
 	                    in
@@ -350,7 +357,7 @@ struct
 	      | NONE => ()
 	    )
 
-	and transParam(tenv, {name, typ = typSym, pos}) = 
+	and transParam tenv {name,escape, typ = typSym, pos} = 
 	    case Symbol.look (tenv, typSym) of
 	        NONE => (err pos "undefined paramter type"; 
 	                 {name = name, ty = T.NIL})
@@ -358,8 +365,8 @@ struct
 	            {name=name, ty=ty}
 	            
 	and transTy (tenv,A.NameTy(sym,pos)) =
-	    (* detect mutually recursive types *)
-	    (case S.look(tenv,sym) of SOME(t) => t)
+	    (case S.look(tenv,sym) of SOME(t) => t
+                                    | NONE => T.UNIT)
 	
 	  | transTy (tenv,A.RecordTy(fields)) =
 	    (checkdup(map #name fields, map #pos fields);

@@ -1,10 +1,14 @@
-structure Parse : sig val parse : string -> Absyn.exp  end =
-struct 
+structure Parse : sig
+  val parse : string -> Absyn.exp
+  val print : string -> unit
+  val test : unit -> Absyn.exp list
+end = struct
   structure TigerLrVals = TigerLrValsFun(structure Token = LrParser.Token)
   structure Lex = TigerLexFun(structure Tokens = TigerLrVals.Tokens)
   structure TigerP = Join(structure ParserData = TigerLrVals.ParserData
 			structure Lex=Lex
 			structure LrParser = LrParser)
+
   fun parse filename =
       let val _ = (ErrorMsg.reset(); ErrorMsg.fileName := filename)
 	  val file = TextIO.openIn filename
@@ -16,7 +20,13 @@ struct
 	   absyn
       end handle LrParser.ParseError => raise ErrorMsg.Error
 
+  fun print filename = PrintAbsyn.print (TextIO.stdOut, parse filename)
+
+  fun test _ =
+      let val testDir = OS.FileSys.openDir "../book-code/testcases/"
+          fun getFiles acc = (case OS.FileSys.readDir testDir of
+                                      NONE => acc
+                                    | SOME x => getFiles (x::acc))
+          fun finalName file = "../book-code/testcases/" ^ file
+      in map (parse o finalName) (getFiles []) end
 end
-
-
-
