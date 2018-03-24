@@ -159,7 +159,7 @@ struct
                                              (case List.last exps of 
           		                         (exp,pos) => #ty (trexp exp)
           		                         ))
-          		    val seqex = map (fn (exp,pos) => #ex (trexp exp)) exps
+          		    val seqex = map (fn (ex,pos) => #exp (trexp ex)) exps
        			 in {exp=(),ty=ty} end
        			 
        		 | trexp (A.AssignExp{var,exp,pos}) =
@@ -226,7 +226,7 @@ struct
 			 	 	 
 			 | trexp (A.CallExp{func,args,pos}) =
 			     case S.look(venv,func) of
-			       NONE => (err pos ("function " ^ S.name(func) ^ " is not defined");
+			       NONE => (err pos ("Function " ^ S.name(func) ^ " is undeclared.");
 			            {exp = (), ty = T.UNIT})
 			     | SOME(E.VarEntry{ty}) =>
 			           (err pos ("function expected, but variable of type: "
