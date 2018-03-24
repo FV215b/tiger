@@ -199,6 +199,10 @@ struct
     fun break (label) : exp = Nx(T.JUMP(T.NAME label, [label]))
 
    (* need sequence exps *)
+   fun letexp(decs,body) = 
+       case decs of 
+         [] => unEx(body)
+         decs => Ex(T.ESEQ(seq (map unNx decs),unEx(body)))
 
 
 end
