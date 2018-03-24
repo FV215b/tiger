@@ -206,24 +206,25 @@ struct
            			 end)
 			 
 			 | trexp (A.ForExp{var,escape,lo,hi,body,pos}) =
-			 	 (case S.look(tenv,var) of 
-			 	   NONE => (err pos ("type " ^ S.name(var) ^ " not found");{exp = (), ty = T.UNIT})
-			 	 | SOME(t) =>
-			 	 	 let val at = actual_ty(t,pos) in 
-			 	 	 	 case at of 
-			 	 	 	 T.INT => 
-			 	 	 	 let val {exp=lo_exp,ty=lo_ty} = trexp lo
-			 	 	 	     val {exp=hi_exp,ty=hi_ty} = trexp hi
-			 	 	 	     val {exp=body_exp,ty=body_ty} = trexp body
-			 	 	 	 in
-			 	 	 	     checkInt (lo_ty,pos);
-			 	 	 	     checkInt (hi_ty,pos);
-			 	 	 	     checkTypeSame (body_ty,T.UNIT,pos);
-			 	 	 	     {exp = (), ty = T.UNIT}
-			 	 	 	 end
-			                        | _ => (err pos ("expected Int type as for id, but " ^ type2string(at) ^ " found");{exp = (), ty = T.UNIT})
-			 	 	 end)
-			 	 	 
+			 	 let 
+			 	   val {exp=lo_exp,ty=lo_ty} = trexp lo
+			 	   val {exp=hi_exp,ty=hi_ty} = trexp hi
+			 	 in (checkInt (lo_ty,pos);
+			 		 checkInt (hi_ty,pos);
+			 		 let 
+			 	   		val startValue = A.SimpleVar(var,pos)
+			 	   		val endSymbol = S.symbol "endValue"
+			 	 		val endValue = A.SimpleVar(endValue,pos)
+			 		    val decs  [A.VarDec{name=var,escape=escape,typ=T.INT,init=lo,pos=pos}]
+			 	   		val iplusexp = A.AssignExp{var=ivar,exp=A.OpExp{left=A.VarExp(startValue,oper=A.PlusOp,right=A.IntExp(1),pos=pos},pos=pos}
+			 	   		val looptest = A.OpExp{left=A.VarExp(startValue),oper=A.LeOp,right=A.VarExp(endValue),pos=pos}
+			 	   		val loopbody = A.SeqExp[(body,pos),(iplusexp,pos)]
+			 	   		val whileloop = A.WhileExp{looptest,loopbody,pos=pos}
+			 	    in 
+			 	        trexp (A.LetExp{decs=decs,body=whileloop,pos=pos})
+			 	    end)
+			 	 end
+
 			 | trexp (A.CallExp{func,args,pos}) =
 			     case S.look(venv,func) of
 			       NONE => (err pos ("Function " ^ S.name(func) ^ " is undeclared.");
