@@ -81,7 +81,17 @@ struct
 
     fun intexp i = Ex(T.CONST(i))
 
-    (* TODO: String Expression *)
+    fun strexp s  =
+	  let val t = List.find
+	      (fn (x) =>
+	          case x of
+	            F.STRING(_,s') => s = s'
+	          | _ => false) (!fragments)
+	  in case t of
+	     NONE => let val nlbl = Temp.newlabel() in
+	         (fragments := F.STRING(nlbl,s) :: !fragments; Ex(T.NAME(nlbl))) end
+	   | SOME(F.STRING(lbl,_)) => Ex(T.NAME(lab))
+    end
     
     (* TODO: Call Expression *)
 
@@ -152,7 +162,7 @@ struct
               T.MOVE(T.TEMP ans, T.CONST 0),
               T.LABEL endlabel,
                 ],T.TEMP ans)
-        end (* return 0 if else is none? *)
+        end
 
     fun recordExp fieldExps =
         let
