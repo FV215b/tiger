@@ -306,8 +306,10 @@ struct
 	 	    val tenv'' = List.foldr(fn(ty, env) => 
 	 	    S.enter(env, #name ty, transTy(env, #ty ty))) tenv' tydecs
 
-	 	in {venv = venv, tenv = tenv''}
-                end
+	 	in 
+            checkdup(map #name tydecs, map #pos tydecs);
+	 	    {venv = venv, tenv = tenv''}
+        end
 	 
 	| transDec(venv, tenv, A.FunctionDec(fundecs)) = 
 	 	let val venv' = List.foldr(fn(dec, env) => Symbol.enter(env, #name dec, transHeader(tenv, dec))) venv fundecs
@@ -317,7 +319,8 @@ struct
 	 	          | SOME(Env.FunEntry entry) => transFun(venv', tenv, entry, dec)
 	 	          | _ => ErrorMsg.impossible "Not function header"
 
-	 	in List.map runDec fundecs;
+	 	in  checkdup(map #name fundecs, map #pos fundecs);
+	 	    List.map runDec fundecs;
 	 	    {venv = venv', tenv = tenv}
 	 	end
 
@@ -352,10 +355,22 @@ struct
 	                        val venv' = List.foldr addparam venv params'
 	                        val expResult = transExp(venv', tenv) body
 	                    in
-	                        checkTypeSame(resultTy, #ty expResult,pos)
+
+	                    	checkdup(map #name params, map #pos params);
+	                        checkTypeSame(#ty expResult,resultTy, pos)
 	                    end
 	            )
-	      | NONE => ()
+	      | NONE => (
+	            let val params' = List.map (transParam tenv) params
+	                fun addparam ({name, ty}, env) = 
+	                Symbol.enter(env, name, E.VarEntry {ty=ty})
+	                val venv' = List.foldr addparam venv params'
+	                val expResult = transExp(venv', tenv) body
+	            in
+	            	checkdup(map #name params, map #pos params);
+	                checkTypeSame(#ty expResult,T.UNIT, pos)
+	            end
+	      )
 	    )
 
 	and transParam tenv {name,escape, typ = typSym, pos} = 
