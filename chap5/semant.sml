@@ -214,14 +214,14 @@ struct
 			 		 let 
 			 	   		val startValue = A.SimpleVar(var,pos)
 			 	   		val endSymbol = S.symbol "endValue"
-			 	 		val endValue = A.SimpleVar(endValue,pos)
-			 		    val decs  [A.VarDec{name=var,escape=escape,typ=T.INT,init=lo,pos=pos}]
-			 	   		val iplusexp = A.AssignExp{var=ivar,exp=A.OpExp{left=A.VarExp(startValue,oper=A.PlusOp,right=A.IntExp(1),pos=pos},pos=pos}
+			 	 		val endValue = A.SimpleVar(endSymbol,pos)
+			 		    val letdecs=[A.VarDec{name=var,escape=escape,typ=NONE,init=lo,pos=pos}]
+			 	   		val iplusexp = A.AssignExp{var=startValue,exp=A.OpExp{left=A.VarExp(startValue),oper=A.PlusOp,right=A.IntExp(1),pos=pos},pos=pos}
 			 	   		val looptest = A.OpExp{left=A.VarExp(startValue),oper=A.LeOp,right=A.VarExp(endValue),pos=pos}
 			 	   		val loopbody = A.SeqExp[(body,pos),(iplusexp,pos)]
-			 	   		val whileloop = A.WhileExp{looptest,loopbody,pos=pos}
+			 	   		val whileloop = A.WhileExp{test=looptest,body=loopbody,pos=pos}
 			 	    in 
-			 	        trexp (A.LetExp{decs=decs,body=whileloop,pos=pos})
+			 	        trexp (A.LetExp{decs=letdecs,body=whileloop,pos=pos})
 			 	    end)
 			 	 end
 
