@@ -283,7 +283,11 @@ struct
 	
     and transDec (venv, tenv, A.VarDec{name,escape, typ = NONE,init, pos}) = 
         let val {exp, ty} = transExp (venv, tenv) init
-        in {tenv = tenv, venv = S.enter(venv, name, E.VarEntry{ty = ty})}
+        in 
+            case ty of
+                T.NIL => (err pos "varible without declared type cannot use nil";
+                          {tenv = tenv, venv = S.enter(venv, name, E.VarEntry{ty = ty})})
+              | _ => {tenv = tenv, venv = S.enter(venv, name, E.VarEntry{ty = ty})}
         end
 
     | transDec (venv, tenv, A.VarDec{name,escape,typ = SOME (type_id, _),init, pos}) =
@@ -306,7 +310,28 @@ struct
 	 	    val tenv'' = List.foldr(fn(ty, env) => 
 	 	    S.enter(env, #name ty, transTy(env, #ty ty))) tenv' tydecs
 
+	 	   fun checkcycle(seen,to,pos) =
+            case to of
+              NONE => (err pos "type not found"; false)
+            | SOME(t) =>
+              case t of
+                T.NAME(s2,r) =>
+                if (List.all (fn (x) => x <> s2) seen)
+                then checkcycle(s2::seen,!r,pos) else false
+              | _ => true
+
+            fun checkeach(nil) = ()
+              | checkeach({name,ty,pos}::ds) =
+                case S.look(tenv'',name) of
+                  SOME(T.NAME(_,r)) =>
+                  if (not (checkcycle([name], !r, pos))) then
+                (err pos ("name type: " ^ S.name(name)
+                          ^ " involved in cyclic definition."))
+                  else checkeach(ds) 
+                | _ => ()
+
 	 	in 
+	 	    checkeach(tydecs);
             checkdup(map #name tydecs, map #pos tydecs);
 	 	    {venv = venv, tenv = tenv''}
         end
