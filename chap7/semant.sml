@@ -129,8 +129,11 @@ struct
  		      | trexp (A.LetExp{decs,body,pos}) = 
  		            let val {venv = venv', tenv = tenv' } = 
  		                     transDecs(venv,tenv,decs)
- 		            in transExp(venv',tenv',level,break) body
+ 		                val {exp=bodyexp,ty=bodyty} = transExp(venv',tenv',level,break) body
+ 		            in
+ 		                {exp=(),ty=bodyty}
  		            end
+ 		           
  		           (* need change on let exp *) 
  		      | trexp (A.RecordExp {fields,typ, pos}) = 
  		        (case S.look(tenv,typ) of 
@@ -286,7 +289,7 @@ struct
 	
 	
 	
-    and transDec (venv, tenv, A.VarDec{name,escape, typ = NONE,init, pos}) = 
+    and transDec (venv, tenv,level,break, A.VarDec{name,escape, typ = NONE,init, pos}) = 
         let val {exp, ty} = transExp (venv, tenv, level, break) init
         in 
             case ty of
@@ -295,7 +298,7 @@ struct
               | _ => {tenv = tenv, venv = S.enter(venv, name, E.VarEntry{ty = ty})}
         end
 
-    | transDec (venv, tenv, A.VarDec{name,escape,typ = SOME (type_id, _),init, pos}) =
+    | transDec (venv, tenv,level,break, A.VarDec{name,escape,typ = SOME (type_id, _),init, pos}) =
         let val {exp, ty} = transExp (venv, tenv, level, break) init
         in (case Symbol.look(tenv, type_id) of
             NONE    => (err pos "unknown type"; 
@@ -309,7 +312,7 @@ struct
                 end)
         end
 
-	| transDec (venv, tenv, A.TypeDec(tydecs)) = 
+	| transDec (venv, tenv,level,break, A.TypeDec(tydecs)) = 
 	 	let val tenv' = List.foldr (fn(ty, env) => 
 	 	                S.enter (env, #name ty, T.NAME (#name ty, ref NONE))) tenv tydecs
 	 	    val tenv'' = List.foldr(fn(ty, env) => 
@@ -341,7 +344,7 @@ struct
 	 	    {venv = venv, tenv = tenv''}
         end
 	 
-	| transDec(venv, tenv, A.FunctionDec(fundecs)) = 
+	| transDec(venv, tenv,level,break,A.FunctionDec(fundecs)) = 
 	 	let val venv' = List.foldr(fn(dec, env) => Symbol.enter(env, #name dec, transHeader(tenv, dec))) venv fundecs
 	 	    fun runDec dec = 
 	 	        case Symbol.look(venv', #name dec) of
@@ -354,12 +357,12 @@ struct
 	 	    {venv = venv', tenv = tenv}
 	 	end
 
-        and transDecs(venv, tenv, []) = {venv=venv, tenv=tenv}
-           | transDecs(venv, tenv, dec::decs) =
-               let val {tenv=tenv', venv=venv'} = transDec(venv, tenv, dec)
-               in transDecs(venv', tenv', decs)
+        and transDecs(venv, tenv, level,break,[]) = {venv=venv, tenv=tenv}
+           | transDecs(venv, tenv,level,break, dec::decs) =
+               let val {tenv=tenv', venv=venv'} = transDec(venv, tenv,level,break, dec)
+               in transDecs(venv', tenv', level,break,decs)
                end
-	and transHeader(tenv, {name, params, result, body, pos}) =
+	and transHeader(tenv,level, {name, params, result, body, pos}) =
 	    let val params' = List.map #ty (List.map (transParam tenv) params)
 	    in
 	        (case result of
@@ -373,7 +376,7 @@ struct
 	        )
 	    end
 
-	and transFun(venv, tenv, entry, {name, params, result, body, pos})=
+	and transFun(venv, tenv, entry, break,{name, params, result, body, pos})=
 	    (case result of 
 	        SOME (res, resultPos) =>
 	            (case Symbol.look (tenv, res) of
