@@ -107,6 +107,8 @@ structure Frame : FRAME = struct
 			end
 		else InReg(temp.newTemp())
 
+	fun name {name: name, formals:_, locals:_, nextLocalOffset_:_} = name
+
 	fun formals {name:_, formals: formals, locals:_, nextLocalOffset:_} = formals
 
 	fun allocLocal {name:_, formals:_, locals: locals, nextLocalOffset: nextLocalOffset} escape = 
@@ -116,7 +118,8 @@ structure Frame : FRAME = struct
 			locals := l :: !locals;
 			l
 		end	
-		
+	
+	fun externalCall (str, args) = Tree.CALL(Tree.NAME(Temp.namedlabel str), args)	
 
 	fun procEntryExit1 {frame: frame, body: Tree.stm} = body
 
