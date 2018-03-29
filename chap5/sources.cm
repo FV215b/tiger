@@ -6,6 +6,8 @@ table.sig
 table.sml
 symbol.sml
 parse.sml
+tree.sml
+frame.sml
 tiger.lex
 tiger.grm
 prabsyn.sml

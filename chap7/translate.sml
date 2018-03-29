@@ -87,10 +87,12 @@ struct
 	          case x of
 	            F.STRING(_,s') => s = s'
 	          | _ => false) (!fragments)
+	   (* try to find already same string and reuse it *)
 	  in case t of
 	     NONE => let val nlbl = Temp.newlabel() in
 	         (fragments := F.STRING(nlbl,s) :: !fragments; Ex(T.NAME(nlbl))) end
-	   | SOME(F.STRING(lbl,_)) => Ex(T.NAME(lab))
+	         (*find nothing, create one *)
+	   | SOME(F.STRING(lbl,_)) => Ex(T.NAME(lab)) (* find same string, reuse it *)
     end
     
     (* TODO: Call Expression *)
