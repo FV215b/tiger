@@ -1,13 +1,13 @@
 structure Frame : FRAME = struct
 	
 	val FP = Temp.newTemp()
-	val wordSize = 32
+	val wordSize = 4
 
 	type frame = {
 		name: Temp.label,
 		formals: access list,
-		locals: access list ref,
-		nextLocalOffset: int ref
+		locals: int ref,
+		instrs: Tree.stm list
 	}
 	
 	type register = string
@@ -80,44 +80,34 @@ structure Frame : FRAME = struct
 	val registers = map (fn (t) => case Temp.table.look(tempMap, t) of 
 							SOME(v) => v) (specialregs @ argregs @ calleesaves @ callersaves)
 
-	fun newFrame {name=name, formals=formals} = 
+	fun newFrame {name: Temp.label, formals: bool list} = 
 		let
-			val pos = List.tabulate(length formals, fn n => (n*4)+8)
-			val pair = ListPair.zip(pos, formals)
+			fun iterate (nil, _) = nil
+				| iterate (curr::a, offset) = 
+					if curr
+					then InFrame(offset)::iterate(a, offset+wordSize)
+					else InReg(Temp.newTemp())::iterate(a, offset)
+			val acc_list = iterate (formals, wordSize)
+			fun view_shift (acc, r) = Tree.MOVE(exp acc (Tree.TEMP FP), Tree.TEMP r)
+      		val shift_instrs = ListPair.map view_shift (acc_list, argregs)
 		in
-			{name = name, formals = map (fn (offset, escape) => 
-											if escape
-											then InFrame offset
-											else InReg (Temp.newTemp())) pair, nextLocalOffset = ref (0-4), locals = ref []}
+			{name = name, formals = acc_list, locals = ref 0, instrs = shift_instrs}
 		end
 
-	(* fun toFormal (offset, escape) =
-		if escape
-		then InFrame offset
-		else InReg (Temp.newTemp()) *)
+	fun name ({name, formals, locals, instrs}: frame): Temp.label = name
 
-	fun toLocal nextLocalOffset escape = 
+	fun formals ({name, formals, locals, instrs}: frame): access list = formals
+
+	fun allocLocal ({name, formals, locals, instrs}: frame) escape = 
 		if escape
 		then
 			let
-				val offset := !nextLocalOffset
+				val ret = InFrame((!locals+1)*(~wordSize)) 
 			in
-				nextLocalOffset := offset - wordSize div 8
-				InFrame offset
+				locals := !locals + 1;
+				ret
 			end
-		else InReg(temp.newTemp())
-
-	fun name {name: name, formals:_, locals:_, nextLocalOffset_:_} = name
-
-	fun formals {name:_, formals: formals, locals:_, nextLocalOffset:_} = formals
-
-	fun allocLocal {name:_, formals:_, locals: locals, nextLocalOffset: nextLocalOffset} escape = 
-		let
-			val l = toLocal nextLocalOffset escape
-		in
-			locals := l :: !locals;
-			l
-		end	
+		else InReg(Temp.newTemp())
 	
 	fun externalCall (str, args) = Tree.CALL(Tree.NAME(Temp.namedlabel str), args)	
 
@@ -134,6 +124,6 @@ structure Frame : FRAME = struct
 			body = body,
 			epilog = "END " ^ Symbol.name name ^ "\n"}
 
-	fun exp (InFrame f) treeExp = Tree.MEM(Tree.BINOP(Tree.PLUS, treeExp, Tree.CONST f))
-			| (InReg temp) treeExp = Tree.TEMP temp
+	fun exp (InFrame f) treeExp = (fn (temp) => Tree.MEM(Tree.BINOP(Tree.PLUS, treeExp, Tree.CONST f)))
+			| (InReg temp) treeExp = (fn (_) => Tree.TEMP temp)
 end
