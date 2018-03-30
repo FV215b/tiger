@@ -37,7 +37,7 @@ struct
         case level of
             Top => []
           | _ =>
-                List.tl (List.map (fn f => (level, f)) (Frame.formals (#frame level)))
+                List.tl (List.map (fn f => (level, f)) (Frame.getFormals (#frame level)))
 
     fun allocLocal level escape = 
         case level of
@@ -81,19 +81,47 @@ struct
 
     fun intexp i = Ex(T.CONST(i))
 
+
     fun strexp s  =
 	  let val t = List.find
 	      (fn (x) =>
 	          case x of
 	            F.STRING(_,s') => s = s'
 	          | _ => false) (!fragments)
+	   (* try to find already same string and reuse it *)
 	  in case t of
 	     NONE => let val nlbl = Temp.newlabel() in
 	         (fragments := F.STRING(nlbl,s) :: !fragments; Ex(T.NAME(nlbl))) end
-	   | SOME(F.STRING(lbl,_)) => Ex(T.NAME(lab))
+	         (*find nothing, create one *)
+	   | SOME(F.STRING(lbl,_)) => Ex(T.NAME(lab)) (* find same string, reuse it *)
     end
     
-    (* TODO: Call Expression *)
+    fun call (_,Lev({parent=Top,...},_),label,exps,isProc) : exp = 
+	    if isProc
+	    then Nx(T.EXP(F.externalCall(Symbol.name label,map unEx exps)))
+	    else Ex(F.externalCall(Symbol.name label,map unEx exps))
+	(* if is externalcall *) 
+	  | call (uselevel,deflevel,label,exps,isprocedure) : exp =
+	    let
+	      fun depth level =
+	            case level of
+	              Top => 0
+	            | Lev({parent,...},_) => 1 + depth(parent)
+	      val diff = depth uselevel - depth deflevel + 1 
+	      fun getStaticLink (diff,level) =
+	          if diff = 0 then T.TEMP Frame.FP
+	          else
+	            let val Lev({parent,frame},_) = level in
+	              Frame.getData(hd(Frame.getFormals frame))(getStaticLink(diff-1,parent))
+	              (* get the static link of one level up *)
+	            end
+	      val ans = T.CALL(T.NAME label,(getStaticLink(diff,uselevel)) :: (map unEx exps))
+	      (* get the static of of parrent and add it to the start of args *)
+	    in if isProc
+	       then Nx(T.EXP(ans)) else Ex(ans)
+    end
+    
+    
 
     fun binop (l, op, r) =
         let val left = unEx(l)
@@ -122,10 +150,10 @@ struct
         let val (Level varlevel, varacc) = varaccess
             fun iter (currentlevel, acc) =
                 if (#count varlevel = #count currentlevel) 
-                then Frame.exp(varacc)(acc)
+                then Frame.getData(varacc)(acc)
                 else 
-                    let val staticlink = hd(Frame.formals #frame currentlevel)
-                    in iter(#parent currentlevel, Frame.exp(staticlink)(acc))
+                    let val staticlink = hd(Frame.getFormals #frame currentlevel)
+                    in iter(#parent currentlevel, Frame.getData(staticlink)(acc))
                     end
         in Ex(iter(curlevel,T.TEMP(Frame.FP))) 
         end
@@ -198,14 +226,24 @@ struct
 
     fun break (label) : exp = Nx(T.JUMP(T.NAME label, [label]))
 
-   (* need sequence exps *)
+  
+  fun sequence ([]) = Nx(T.EXP(T.CONST 0))
+    | sequence ([exp]) = exp
+    | sequence (exps) = let val restexp = seq(map unNx (List.take(exps,length(exps)-1))      
+    						val lastexp = List.last(exps) in
+    					    case lastexp of
+                                 Nx(s) => Nx(T.SEQ(restexp,s))
+           				       | _ => Ex(T.ESEQ(restexp,unEx(last)))
+        			    end
+        			   
+    
    fun letexp(decs,body) = 
        case decs of 
          [] => unEx(body)
          decs => Ex(T.ESEQ(seq (map unNx decs),unEx(body)))
 
 
-end
+   end
 
 
 
