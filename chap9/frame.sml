@@ -98,9 +98,9 @@ structure Frame : FRAME = struct
 			{name = name, formals = acc_list, locals = ref 0, instrs = shift_instrs}
 		end
 
-	fun getName ({name, formals, locals, instrs}: frame): Temp.label = name
+	fun name ({name, formals, locals, instrs}: frame): Temp.label = name
 
-	fun getFormals ({name, formals, locals, instrs}: frame): access list = formals
+	fun formals ({name, formals, locals, instrs}: frame): access list = formals
 
 	fun allocLocal ({name, formals, locals, instrs}: frame) escape = 
 		if escape
