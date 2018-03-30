@@ -131,7 +131,7 @@ struct
  		                     transDecs(venv,tenv,decs)
  		                val {exp=bodyexp,ty=bodyty} = transExp(venv',tenv',level,break) body
  		            in
- 		                {exp=(R.letexp(decexps,bodyexp),ty=bodyty}
+ 		                {exp=(R.letexp(decexps,bodyexp)),ty=bodyty}
  		            end
  		           
  		           (* need change on let exp *) 
@@ -149,7 +149,7 @@ struct
           			    val fexp = map (fn ({exp,ty},_) => exp) fds
            			 in
               			checkParaList(ttlist,fts,pos);
-             			 {exp=(Tr.record(fexp),ty=T.RECORD(tlist,u)}
+             			 {exp=(Tr.record(fexp)),ty=T.RECORD(tlist,u)}
            			 end
            		  | _ =>  (err pos ("expected record type, but " ^ type2string(actual_ty(t,pos)) ^ " found");
                                   {exp = (), ty=T.UNIT})
@@ -176,19 +176,24 @@ struct
 
 			 | trexp (A.IfExp{test, then', else', pos}) =
      			  (checkInt(#ty (trexp test),pos);
-      			   if isSome(else') then (checkTypeSame(#ty (trexp then'), #ty (trexp (valOf else')),pos);{exp = (Tr.ifexp(#ty (trexp test),#ty (trexp then'),#ty (trexp (valOf else'))), ty = #ty (trexp then')})
-      			   else (checkTypeSame(#ty (trexp then'),T.UNIT,pos); {exp = (Tr.ifexp(#ty (trexp test),#ty (trexp then'),NONE), ty = #ty (trexp then')})
+      			   if isSome(else') 
+               then 
+               (checkTypeSame(#ty (trexp then'), #ty (trexp (valOf else')),pos);
+               {exp = (Tr.ifexp(#ty (trexp test)),#ty (trexp then'),#ty (trexp (valOf else'))), ty = #ty (trexp then')})
+      			   else (checkTypeSame(#ty (trexp then'),T.UNIT,pos); 
+               {exp = (Tr.ifexp(#ty (trexp test),#ty (trexp then'),NONE)), ty = #ty (trexp then')}
+               ))
 
 
 			 | trexp (A.WhileExp{test,body,pos}) =
       	   	    let
-      	   	    	done_label = Temp.newlabel()
+      	   	    	  val done_label = Temp.newlabel()
                     val {exp=test_exp,ty=test_ty} = trexp test
                     val {exp=body_exp,ty=body_ty} = transExp(venv,tenv,level,done_label) body
      		    in
       			    checkInt(test_ty,pos);
           			checkTypeSame(body_ty,T.UNIT,pos);
-        		    {exp=(Tr.loop(test_exp,test_body,done_label),ty=T.UNIT}
+        		    {exp=(Tr.loop(test_exp,test_body,done_label)),ty=T.UNIT}
                 end
                 
              (* what is done label here? *)   
@@ -206,7 +211,7 @@ struct
 			                in
 			                  checkInt(size_ty,pos);
 			                  checkTypeSame(tt,init_ty,pos);
-			                  {exp=(Tr.array(size_exp,init_exp),ty=at}
+			                  {exp=(Tr.array(size_exp,init_exp)),ty=at}
 			                end
 			              |_ => (err pos ("expected Array type, but " ^ type2string(at) ^ " found" );{exp = (), ty = T.UNIT})
            			 end)
@@ -243,14 +248,14 @@ struct
 			             val argtypelist = map trexp args 
 			           in
 			             checkParaList(map #ty argtypelist,formals,pos);
-			             {exp=(R.call(level,funlevel,nlabel,map #exp argtypelist,T.UNIT),
+			             {exp=(R.call(level,funlevel,nlabel,map #exp argtypelist,T.UNIT)),
 			              ty=actual_ty(result,pos)}
                        end
                        
 		    (* no idea how call works *)
  		    and trvar (A.SimpleVar(id, pos)) = 
  		        (case S.look(venv,id)
- 			        of SOME(E.VarEntry{access,ty}) => {exp=(Tr.simpleVar(access,level), ty = actual_ty (ty,pos)}
+ 			        of SOME(E.VarEntry{access,ty})=>{exp=(Tr.simpleVar(access,level)), ty = actual_ty (ty,pos)}
  			        |  NONE                 => (err pos ("undefined variable "^ S.name id);{exp=(), ty = T.UNIT})
                                 | _ => (err pos ("undefined type "^ S.name id);{exp=(), ty = T.UNIT})
  			    )
@@ -262,7 +267,7 @@ struct
 			                 (case List.find (fn x => (#1 x) = sym) tylist of
 			                    NONE => (err pos ("id: " ^ S.name sym ^ " not found");
 			                      {exp=(),ty=T.NIL})
-			                  | SOME(ft) =>  {exp=(Tr.fieldVar(exp1,List.length tylist), ty=actual_ty(#2 ft,pos)})
+			                  | SOME(ft) =>  {exp=(Tr.fieldVar(exp1,List.length tylist)), ty=actual_ty(#2 ft,pos)})
 			                  
 			               | _ => (err pos ("expected record type, but "
 			                             ^ type2string(ty1) ^ " found"); {exp=(),ty=T.NIL})
@@ -275,7 +280,7 @@ struct
 			                T.ARRAY(t,_) =>
 			               let val {exp=exp_exp,ty=exp_ty} = trexp exp in
 			                     case exp_ty of
-			                       T.INT => {exp=(Tr.subscriptVar(var_exp,exp_exp),ty=t}
+			                       T.INT => {exp=(Tr.subscriptVar(var_exp,exp_exp)),ty=t}
 			                       | _ =>
 			                         (err pos ("array subscript should be int, but "
 			                                 ^ type2string(exp_ty) ^ " found"); {exp=(),ty=T.UNIT})
@@ -297,7 +302,7 @@ struct
         in 
             case ty of
                 T.NIL => (err pos "varible without declared type cannot use nil";
-                          {tenv = tenv, venv = S.enter(venv, name, E.VarEntry{ty = ty}), exps=[])}
+                          {tenv = tenv, venv = S.enter(venv, name, E.VarEntry{ty = ty}), exps=[]})
               | _ => {tenv = tenv, venv = S.enter(venv, name, E.VarEntry{ty = ty}), exps=[Tr.assgin(exp',exp)]}
         end
 
@@ -364,7 +369,7 @@ struct
            | transDecs(venv, tenv,level,break, dec::decs) =
                let val {venv=venv', tenv=tenv',exps = exps' } = transDec(venv, tenv,level,dec,break)
                    val {venv=venv'',tenv=tenv'',exps=exps'' } = transDecs(venv',tenv',level,decs,break)
-               in  {tenv'',venv'',exps'@exps''}
+               in  {tenv=tenv'',venv=venv'',exps=exps'@exps''}
                end
                
 	and transHeader(tenv,level, {name, params, result, body, pos}) =

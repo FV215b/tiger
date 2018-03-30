@@ -1,7 +1,10 @@
 structure Frame : FRAME = struct
 	
-	val FP = Temp.newTemp()
+	val FP = Temp.newtemp()
 	val wordSize = 4
+	datatype access = InFrame of int
+					| InReg of Temp.temp
+	
 
 	type frame = {
 		name: Temp.label,
@@ -12,8 +15,6 @@ structure Frame : FRAME = struct
 	
 	type register = string
 
-	datatype access = InFrame of int
-					| InReg of Temp.temp
 	
 	datatype frag = PROC of {body: Tree.stm, frame: frame}
 					| STRING of Temp.label * string
@@ -73,12 +74,15 @@ structure Frame : FRAME = struct
 	val tempMap = foldl (fn ((key, value), table) => Temp.Table.enter(table, key, value)) Temp.Table.empty reglist
 
 	fun tempToString t = 
-		case Temp.table.look(tempMap, t) of
+		case Temp.Table.look(tempMap, t) of
 			SOME(v) => v
 			| NONE => Temp.makestring t
 	
-	val registers = map (fn (t) => case Temp.table.look(tempMap, t) of 
+	val registers = map (fn (t) => case Temp.Table.look(tempMap, t) of 
 							SOME(v) => v) (specialregs @ argregs @ calleesaves @ callersaves)
+
+    fun exp (InFrame f)= (fn (temp) => Tree.MEM(Tree.BINOP(Tree.PLUS, temp, Tree.CONST f)))
+			| exp (InReg temp) = (fn (_) => Tree.TEMP temp)
 
 	fun newFrame {name: Temp.label, formals: bool list} = 
 		let
@@ -86,7 +90,7 @@ structure Frame : FRAME = struct
 				| iterate (curr::a, offset) = 
 					if curr
 					then InFrame(offset)::iterate(a, offset+wordSize)
-					else InReg(Temp.newTemp())::iterate(a, offset)
+					else InReg(Temp.newtemp())::iterate(a, offset)
 			val acc_list = iterate (formals, wordSize)
 			fun view_shift (acc, r) = Tree.MOVE(exp acc (Tree.TEMP FP), Tree.TEMP r)
       		val shift_instrs = ListPair.map view_shift (acc_list, argregs)
@@ -97,9 +101,6 @@ structure Frame : FRAME = struct
 	fun getName ({name, formals, locals, instrs}: frame): Temp.label = name
 
 	fun getFormals ({name, formals, locals, instrs}: frame): access list = formals
-	
-	fun getData (InFrame(k))= (fn (temp) => T.MEM(T.BINOP(T.PLUS,temp,T.CONST k)))
- 	  | getData (InReg(temp)) = (fn (_) => T.TEMP temp)
 
 	fun allocLocal ({name, formals, locals, instrs}: frame) escape = 
 		if escape
@@ -110,7 +111,7 @@ structure Frame : FRAME = struct
 				locals := !locals + 1;
 				ret
 			end
-		else InReg(Temp.newTemp())
+		else InReg(Temp.newtemp())
 	
 	fun externalCall (str, args) = Tree.CALL(Tree.NAME(Temp.namedlabel str), args)	
 
@@ -122,11 +123,10 @@ structure Frame : FRAME = struct
 				src=[ZERO,RA,SP]@calleesaves,
 				dst=[],jump=SOME[]}]
 
-	fun procEntryExit3 (FRAME{name, params, locals}, body) =
+	fun procEntryExit3 ({name, formals, locals, instrs}:frame, body) =
 		{prolog = "PROCEDURE " ^ Symbol.name name ^ "\n",
 			body = body,
 			epilog = "END " ^ Symbol.name name ^ "\n"}
 
-	fun exp (InFrame f) treeExp = (fn (temp) => Tree.MEM(Tree.BINOP(Tree.PLUS, treeExp, Tree.CONST f)))
-			| (InReg temp) treeExp = (fn (_) => Tree.TEMP temp)
+
 end

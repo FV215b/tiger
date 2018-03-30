@@ -13,7 +13,7 @@ end
 structure Translate : TRANSLATE =
 struct
 
-    structure Frame : FRAME = MipsFrame
+    structure Frame : FRAME = Frame
 
     structure T = Tree
     
@@ -36,8 +36,9 @@ struct
     fun formals level = 
         case level of
             Top => []
-          | _ =>
-                List.tl (List.map (fn f => (level, f)) (Frame.getFormals (#frame level)))
+           | Level {parent=parent,frame=frame,...}  =>
+               let val formals = tl (Frame.formals frame) in
+      (map (fn (x) => (lev,x)) formals) end
 
     fun allocLocal level escape = 
         case level of
@@ -63,9 +64,9 @@ struct
       | unEx (Nx n) = T.ESEQ(n, T.CONST 0)
 
     fun unCx(Cx c) = c
-      | unCx(Ex e) = (fn (t, f) => T.CJUMP(T.NE, e, T.CONST 0, t, f)
-      | unCx(Ex (T.CONST 0)) = (fn(t,f) => JUMP(T.NAME f, [f])
-      | unCx(Ex (T.CONST 1)) = (fn(t,f) => JUMP(T.NAME t, [t])
+      | unCx(Ex e) = (fn (t, f) => T.CJUMP(T.NE, e, T.CONST 0, t, f))
+      | unCx(Ex (T.CONST 0)) = (fn(t,f) => JUMP(T.NAME f, [f]))
+      | unCx(Ex (T.CONST 1)) = (fn(t,f) => JUMP(T.NAME t, [t]))
       | unCx(Nx _) = ErrorMsg.impossible "unCx cannot get Nx"
 
     fun unNx(Nx n) = n
@@ -120,13 +121,11 @@ struct
 	    in if isProc
 	       then Nx(T.EXP(ans)) else Ex(ans)
     end
-    
-    
 
-    fun binop (l, op, r) =
+    fun binop (l, oper, r) =
         let val left = unEx(l)
             val right = unEx(r)
-            val bop = case op of
+            val bop = case oper of
                             Abysn.PlusOp => T.PLUS
                           | Abysn.MinusOp => T.MINUS
                           | Abysn.TimesOp => T.MUL
@@ -134,7 +133,7 @@ struct
         in Ex(T.BINOP(bop, left, right))
         end
 
-    fun relop (l, op, r) =
+    fun relop (l, oper, r) =
         let val left = unEx(e1)
             val right = unEx(e2)
                 val rop = case oper of Abysn.EqOp => T.EQ
@@ -179,7 +178,7 @@ struct
                 JUMP(T.NAME(endlabel),[endlabel]),
                 T.LABEL flabel
                 T.MOVE(T.TEMP ans, valOf (elseExp)),
-                T.LABEL endlabel,
+                T.LABEL endlabel
                 ],T.TEMP ans)
           else 
             ESEQ(seq[condFn(tlabel,flabel),
@@ -188,7 +187,7 @@ struct
               JUMP(T.NAME(endlabel),[endlabel]),
               T.LABEL flabel
               T.MOVE(T.TEMP ans, T.CONST 0),
-              T.LABEL endlabel,
+              T.LABEL endlabel
                 ],T.TEMP ans)
         end
 
@@ -229,7 +228,9 @@ struct
   
   fun sequence ([]) = Nx(T.EXP(T.CONST 0))
     | sequence ([exp]) = exp
-    | sequence (exps) = let val restexp = seq(map unNx (List.take(exps,length(exps)-1))      
+    | sequence (exps) = 
+                let 
+                val restexp = seq(map unNx (List.take(exps,length(exps)-1)))      
     						val lastexp = List.last(exps) in
     					    case lastexp of
                                  Nx(s) => Nx(T.SEQ(restexp,s))
@@ -240,7 +241,7 @@ struct
    fun letexp(decs,body) = 
        case decs of 
          [] => unEx(body)
-         decs => Ex(T.ESEQ(seq (map unNx decs),unEx(body)))
+      | decs => Ex(T.ESEQ(seq (map unNx decs),unEx(body)))
 
 
    end
