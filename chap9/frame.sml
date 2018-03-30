@@ -94,9 +94,12 @@ structure Frame : FRAME = struct
 			{name = name, formals = acc_list, locals = ref 0, instrs = shift_instrs}
 		end
 
-	fun name ({name, formals, locals, instrs}: frame): Temp.label = name
+	fun getName ({name, formals, locals, instrs}: frame): Temp.label = name
 
-	fun formals ({name, formals, locals, instrs}: frame): access list = formals
+	fun getFormals ({name, formals, locals, instrs}: frame): access list = formals
+	
+	fun getData (InFrame(k))= (fn (temp) => T.MEM(T.BINOP(T.PLUS,temp,T.CONST k)))
+ 	  | getData (InReg(temp)) = (fn (_) => T.TEMP temp)
 
 	fun allocLocal ({name, formals, locals, instrs}: frame) escape = 
 		if escape

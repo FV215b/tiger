@@ -37,7 +37,7 @@ struct
         case level of
             Top => []
           | _ =>
-                List.tl (List.map (fn f => (level, f)) (Frame.formals (#frame level)))
+                List.tl (List.map (fn f => (level, f)) (Frame.getFormals (#frame level)))
 
     fun allocLocal level escape = 
         case level of
@@ -112,7 +112,7 @@ struct
 	          if diff = 0 then T.TEMP Frame.FP
 	          else
 	            let val Lev({parent,frame},_) = level in
-	              Frame.exp(hd(Frame.getFormals frame))(getStaticLink(diff-1,parent))
+	              Frame.getData(hd(Frame.getFormals frame))(getStaticLink(diff-1,parent))
 	              (* get the static link of one level up *)
 	            end
 	      val ans = T.CALL(T.NAME label,(getStaticLink(diff,uselevel)) :: (map unEx exps))
@@ -150,10 +150,10 @@ struct
         let val (Level varlevel, varacc) = varaccess
             fun iter (currentlevel, acc) =
                 if (#count varlevel = #count currentlevel) 
-                then Frame.exp(varacc)(acc)
+                then Frame.getData(varacc)(acc)
                 else 
-                    let val staticlink = hd(Frame.formals #frame currentlevel)
-                    in iter(#parent currentlevel, Frame.exp(staticlink)(acc))
+                    let val staticlink = hd(Frame.getFormals #frame currentlevel)
+                    in iter(#parent currentlevel, Frame.getData(staticlink)(acc))
                     end
         in Ex(iter(curlevel,T.TEMP(Frame.FP))) 
         end
@@ -226,14 +226,24 @@ struct
 
     fun break (label) : exp = Nx(T.JUMP(T.NAME label, [label]))
 
-   (* need sequence exps *)
+  
+  fun sequence ([]) = Nx(T.EXP(T.CONST 0))
+    | sequence ([exp]) = exp
+    | sequence (exps) = let val restexp = seq(map unNx (List.take(exps,length(exps)-1))      
+    						val lastexp = List.last(exps) in
+    					    case lastexp of
+                                 Nx(s) => Nx(T.SEQ(restexp,s))
+           				       | _ => Ex(T.ESEQ(restexp,unEx(last)))
+        			    end
+        			   
+    
    fun letexp(decs,body) = 
        case decs of 
          [] => unEx(body)
          decs => Ex(T.ESEQ(seq (map unNx decs),unEx(body)))
 
 
-end
+   end
 
 
 
