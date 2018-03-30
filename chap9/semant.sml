@@ -127,11 +127,11 @@ struct
                         end
  				     
  		      | trexp (A.LetExp{decs,body,pos}) = 
- 		            let val {venv = venv', tenv = tenv' } = 
+ 		            let val {venv = venv', tenv = tenv',exps = decexps } = 
  		                     transDecs(venv,tenv,decs)
  		                val {exp=bodyexp,ty=bodyty} = transExp(venv',tenv',level,break) body
  		            in
- 		                {exp=(),ty=bodyty}
+ 		                {exp=(R.letexp(decexps,bodyexp),ty=bodyty}
  		            end
  		           
  		           (* need change on let exp *) 
@@ -246,6 +246,7 @@ struct
 			             {exp=(R.call(level,funlevel,nlabel,map #exp argtypelist,T.UNIT),
 			              ty=actual_ty(result,pos)}
                        end
+                       
 		    (* no idea how call works *)
  		    and trvar (A.SimpleVar(id, pos)) = 
  		        (case S.look(venv,id)
@@ -359,11 +360,13 @@ struct
 	 	    {venv = venv', tenv = tenv, exps=[]}
 	 	end
 
-        and transDecs(venv, tenv, level,break,[]) = {venv=venv, tenv=tenv}
+        and transDecs(venv, tenv, level,break,[]) = {venv=venv, tenv=tenv, exps = []}
            | transDecs(venv, tenv,level,break, dec::decs) =
-               let val {tenv=tenv', venv=venv'} = transDec(venv, tenv,level,break, dec)
-               in transDecs(venv', tenv', level,break,decs)
+               let val {venv=venv', tenv=tenv',exps = exps' } = transDec(venv, tenv,level,dec,break)
+                   val {venv=venv'',tenv=tenv'',exps=exps'' } = transDecs(venv',tenv',level,decs,break)
+               in  {tenv'',venv'',exps'@exps''}
                end
+               
 	and transHeader(tenv,level, {name, params, result, body, pos}) =
 	    let val params' = List.map #ty (List.map (transParam tenv) params)
           val label = Temp.newlabel()
