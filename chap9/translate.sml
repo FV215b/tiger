@@ -81,19 +81,47 @@ struct
 
     fun intexp i = Ex(T.CONST(i))
 
+
     fun strexp s  =
 	  let val t = List.find
 	      (fn (x) =>
 	          case x of
 	            F.STRING(_,s') => s = s'
 	          | _ => false) (!fragments)
+	   (* try to find already same string and reuse it *)
 	  in case t of
 	     NONE => let val nlbl = Temp.newlabel() in
 	         (fragments := F.STRING(nlbl,s) :: !fragments; Ex(T.NAME(nlbl))) end
-	   | SOME(F.STRING(lbl,_)) => Ex(T.NAME(lab))
+	         (*find nothing, create one *)
+	   | SOME(F.STRING(lbl,_)) => Ex(T.NAME(lab)) (* find same string, reuse it *)
     end
     
-    (* TODO: Call Expression *)
+    fun call (_,Lev({parent=Top,...},_),label,exps,isProc) : exp = 
+	    if isProc
+	    then Nx(T.EXP(F.externalCall(Symbol.name label,map unEx exps)))
+	    else Ex(F.externalCall(Symbol.name label,map unEx exps))
+	(* if is externalcall *) 
+	  | call (uselevel,deflevel,label,exps,isprocedure) : exp =
+	    let
+	      fun depth level =
+	            case level of
+	              Top => 0
+	            | Lev({parent,...},_) => 1 + depth(parent)
+	      val diff = depth uselevel - depth deflevel + 1 
+	      fun getStaticLink (diff,level) =
+	          if diff = 0 then T.TEMP Frame.FP
+	          else
+	            let val Lev({parent,frame},_) = level in
+	              Frame.exp(hd(Frame.getFormals frame))(getStaticLink(diff-1,parent))
+	              (* get the static link of one level up *)
+	            end
+	      val ans = T.CALL(T.NAME label,(getStaticLink(diff,uselevel)) :: (map unEx exps))
+	      (* get the static of of parrent and add it to the start of args *)
+	    in if isProc
+	       then Nx(T.EXP(ans)) else Ex(ans)
+    end
+    
+    
 
     fun binop (l, op, r) =
         let val left = unEx(l)
