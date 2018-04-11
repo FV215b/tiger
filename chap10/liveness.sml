@@ -40,8 +40,6 @@ structure FR = MipsFrame
 type liveSet = S.set
 type liveMap = liveSet IT.table
 
-(* type tempEdge = {src:Temp.temp,dst:Temp.temp} *)
-
 (*
 fun show(output, IGRAPH{graph,moves}) =
   let
@@ -85,8 +83,8 @@ fun interferenceGraph flowgraph =
 		
 		fun mapEnter(node,(inmap,outmap)) = 
 		let
-		    val oldOutSet = lookTable(outmap,(#id node)) (* Save old livein set *)
-		    val oldInSet = lookTable(inmap,(#id node)) (* Save old liveout set *)
+		    val oldOutSet = lookTable(outmap,(#id node)) 
+		    val oldInSet = lookTable(inmap,(#id node)) 
 		    val (newOutSet,newInSet) = computeLiveIn(node,(inmap,outmap))
 		in
 		    if S.equal(newInSet,oldInSet) andalso S.equal(newOutSet,oldOutSet)
@@ -102,10 +100,7 @@ fun interferenceGraph flowgraph =
     	
     fun Init_map () =  foldl (fn (F.Node{id,...},m) => IT.enter(m,id,S.empty)) IT.empty (List.rev flowgraph)
 
-        
-
-    (* move to in later? *)
-    val liveout_map : liveMap = iter ((make_empty_map ()), (make_empty_map ()))
+    val liveOutMap : liveMap = iterLiveInOutMap ((Init_map()), (Init_map()))
 
 
     (* set liveout for each node *)
@@ -117,6 +112,17 @@ fun interferenceGraph flowgraph =
             | NONE => ErrorMsg.impossible("liveout map is not one-to-one")
         ) flowgraph;
      (* after that : origin in *)
+     
+   fun Move_edge flowgraph = 
+   let fun moveEdgeHelper (node,anslist) = if (#ismove node) then 
+         let val definode = searchTempTable(List.hd (#def node))
+           val useinode = searchTempTable(List.hd (#use node))
+         in if isSome(List.find (fn (inode1,inode2) => (inode1 = definode) andalso (inode2 = useinode)) anslist) then anslist else (definode,useinode)::anslist
+         end 
+       else anslist 
+   in
+     foldl moveEdgeHelper [] flowgraph
+   end
      
 in
 (* the body of interferenceGraph *)
