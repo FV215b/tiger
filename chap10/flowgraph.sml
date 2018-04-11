@@ -1,4 +1,4 @@
-structure Flowgraph =
+structure Flow =
 struct
 datatype node = Node of {
                 id: int,
@@ -6,7 +6,7 @@ datatype node = Node of {
                 use: Temp.temp list,
                 ismove: bool,
                 succ: node list ref,
-                prev: node list ref,
-                liveout: Temp.temp list ref}
+                prev: node list ref}
+                
 type flowgraph = node list
 end
