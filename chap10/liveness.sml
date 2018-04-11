@@ -1,8 +1,8 @@
 signature LIVENESS =
 sig
   datatype inode = NODE of {temp: Temp.temp,
-                                       adj: node list ref,
-                                       status: status ref}
+                                       adj: node list ref
+                                      }
 
   datatype igraph = IGRAPH of {graph: inode list,
                                moves: (inode*inode) list}
@@ -23,8 +23,8 @@ structure Liveness :> LIVENESS =
 struct
 
 datatype inode = NODE of {temp: Temp.temp,
-                                       adj: node list ref,
-                                       status: status ref}
+                                       adj: node list ref
+                                      }
 
 datatype igraph = IGRAPH of {graph: inode list,
                                moves: (inode*inode) list}
