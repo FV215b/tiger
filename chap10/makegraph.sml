@@ -2,6 +2,7 @@
 signature MAKE_GRAPH =
 sig
   val instrs2graph: Assem.instr list -> Flowgraph.flowgraph
+  val prt: Flow.flowgraph -> unit
 end
 
 structure MakeGraph : MAKE_GRAPH =
@@ -9,6 +10,24 @@ struct
 
 structure T = Temp
 structure F = Flowgraph
+
+fun prt(nodes) =
+  let
+    fun templisttostring tlist = foldl (fn (tp,s) => s^ " " ^ (T.makestring tp)) "" tlist
+    fun nodelisttostring nlist = foldl (fn (nd,s) => s^ " " ^ (Int.toString (#id nd))) "" nlist
+  in
+    app
+      (fn (nd) =>
+        TextIO.print(
+          ("n" ^ (Int.toString (#id nd)) ^ ": " ^
+           "def: " ^ (templisttostring (#def nd))^ "\n" ^
+           "use: " ^ (templisttostring (#use nd)) ^ "\n" ^
+           "succ: " ^ (nodelisttostring !(#succ nd))  ^ "\n" ^
+           "prev: " ^ (nodelisttostring !(#prev nd))  ^ "\n" ))
+      )
+      nodes
+  end
+
 
 fun makeCounter initVal =
 	let val r = ref initVal
