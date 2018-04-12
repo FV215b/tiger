@@ -56,12 +56,13 @@ fun lookTable (table,key) = valOf(IT.look(table,key))
 
 fun interferenceGraph flowgraph =
   let
-	  type tempMap = inode TT
+  
  	 tempmap = TT.empty
  	 fun searchTempTable(key: Temp.temp) = 
          case TT.look(tempmap, key) of 
           NONE => (TT.enter(tempmap, key, NODE{key, nil ref}); searchTempTable(key)
         | SOME node => node
+        
     fun iterLiveInOutMap(livein_map,liveout_map) =
     let
         val changed = ref false
