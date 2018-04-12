@@ -1,7 +1,7 @@
 signature LIVENESS =
 sig
   datatype inode = NODE of {temp: Temp.temp,
-                                       adj: node list ref
+                                       adj: inode list ref
                                       }
 
   datatype igraph = IGRAPH of {graph: inode list,
@@ -39,7 +39,7 @@ structure FR = MipsFrame
 
 type liveSet = S.set
 type liveMap = liveSet IT.table
-
+type tempEdge = {src:T.temp, dst:T.temp}
 
 fun prt(IGRAPH{graph,moves}) =
   let
@@ -105,9 +105,34 @@ fun interferenceGraph flowgraph =
    in
      foldl moveEdgeHelper [] flowgraph
    end
-     
-     
+
+    fun inodeEdge (node as F.Node{def,liveout,...}) : tempEdge list = 
+    let
+        fun iterOut d = foldl (fn (out, l) => if d <> out then {src:d,dst:out}::l else l) nil liveout
+    in
+        foldl (fn (d) => (iterOut d) @ ll) nil def
+    end
+
+    val allEdges : tempEdge list = foldl (fn (n, l) => inodeEdge(n) @ l) nil flowgraph
+    
 in
 (* the body of interferenceGraph *)
- IGRAPH{graph=inodeEdge(flowgraph), moves=moveEdge(flowgraph)}
+    app(
+        fn {src,dst} =>
+        let
+            val src_inode as NODE{adj=src_adj,...} = searchTempTable(src)
+            val dst_inode as NODE{adj=dst_adj,...} = searchTempTable(dst)
+        in
+            if List.exists (fn x => x=dst_inode) (!src_adj)
+            andalso List.exists (fn x => y=src_inode) (!dst_adj)
+            then
+                ()
+            else
+                let in
+                    src_adj := dst_inode::(!src_adj);
+                    dst_adj := src_inode::(!dst_adj)
+                end
+        end
+    ) allEdges;
+    IGRAPH{graph=TT.listItems(tempmap), moves=moveEdge(flowgraph)}
 end
