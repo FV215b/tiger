@@ -34,6 +34,13 @@ structure T = Temp
 type allocation = Frame.register TT.table
 
 (* coloring function *)
-fun color{interference = Liveness.IGRAPH{graph,moves},
-          initial=initAlloc, registers} = ()
+fun color{interference = L.IGRAPH{graph,moves},
+          initial=initAlloc, registers} = 
+let fun Simplify
+	fun AssignColor
+	val colorStack = Simplify(graph,initAlloc)
+	val regAllocation = AssignColors {stack= colorStack,initial = initAlloc, register = registers}
+in
+    regAllocation
+end
 
