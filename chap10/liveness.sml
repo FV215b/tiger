@@ -35,7 +35,6 @@ structure S = ListSetFn(TempKey)
 structure T = Temp
 structure TT = Temp.Table
 structure IT = IntMapTable(type key=int fun getInt n = n)
-structure FR = MipsFrame
 
 type liveSet = S.set
 type liveMap = liveSet IT.table
@@ -43,10 +42,10 @@ type tempEdge = {src:T.temp, dst:T.temp}
 
 fun prt(IGRAPH{graph,moves}) =
   let
-      fun adjtostring ilist = foldl (fn (nd,s) => s^ " " ^ (T.makestring (#temp nd))) "" ilist
-	  fun prthelp(node as I.NODE{temp,adj,status}) =
+      fun adjtostring ilist = foldl (fn (nd as NODE{temp,...},s) => s^ " " ^ (T.makestring temp)) "" ilist
+	  fun prthelp(node as NODE{temp,adj}) =
       TextIO.print(
-        ("{temp=" ^ (T.makestring temp) ^ ", and adj =" ^ adjtostring(adj) ^ "}\n"))
+        ("{temp=" ^ (T.makestring temp) ^ ", and adj =" ^ adjtostring(!adj) ^ "}\n"))
   in
     app prthelp graph
   end
@@ -57,10 +56,10 @@ fun lookTable (table,key) = valOf(IT.look(table,key))
 fun interferenceGraph flowgraph =
   let
   
- 	 tempmap = TT.empty
+ 	 val tempmap = ref TT.empty
  	 fun searchTempTable(key: Temp.temp) = 
-         case TT.look(tempmap, key) of 
-          NONE => (TT.enter(tempmap, key, NODE{key, nil ref}); searchTempTable(key)
+         case TT.look(!tempmap, key) of 
+          NONE => (tempmap := TT.enter(!tempmap, key, NODE{temp=key, adj= ref nil}); searchTempTable(key))
         | SOME node => node
         
     fun iterLiveInOutMap(livein_map,liveout_map) =
@@ -68,10 +67,10 @@ fun interferenceGraph flowgraph =
         val changed = ref false
         
         fun computeLiveOut(inmap,node) =
-          case node of F.Node{succ,...} => foldl (fn (F.Node{id,...},s) => S.union(look(inmap,id),s)) S.empty (!succ)
-                     | _ => ()
+          case node of F.Node{succ,...} => foldl (fn (F.Node{id,...},s) => S.union(lookTable(inmap,id),s)) S.empty (!succ)
+
 		
-		fun computeLiveIn(node,(inmap,outmap) = 
+		fun computeLiveIn(node,(inmap,outmap)) = 
 		case node of F.Node{id,def,use,...} =>
 			let val useSet = S.addList(S.empty,use)
 			    val defSet = S.addList(S.empty,def)
@@ -79,19 +78,19 @@ fun interferenceGraph flowgraph =
 			    val newInSet = S.union(useSet,S.difference(newOutSet,defSet))
 			in (newOutSet,newInSet)
 			end
-		          | _ => (S.empty,S.empty)
+
 		
-		fun mapEnter(node,(inmap,outmap)) = 
+		fun mapEnter(node as F.Node{id,...},(inmap,outmap)) = 
 		let
-		    val oldOutSet = lookTable(outmap,(#id node)) 
-		    val oldInSet = lookTable(inmap,(#id node)) 
+		    val oldOutSet = lookTable(outmap,id )
+		    val oldInSet = lookTable(inmap,id) 
 		    val (newOutSet,newInSet) = computeLiveIn(node,(inmap,outmap))
 		in
 		    if S.equal(newInSet,oldInSet) andalso S.equal(newOutSet,oldOutSet)
 		    then () else changed := true;
-		    (IT.enter(inmap,(#id node),newInSet),IT.enter(outmap,(#id node),newOutSet))
+		    (IT.enter(inmap,id,newInSet),IT.enter(outmap,id,newOutSet))
         end
-		val (newInMap,newOutMap) = mapEnter(livein_map,liveout_map) flowgraph
+		val (newInMap,newOutMap) =foldr mapEnter(livein_map,liveout_map) flowgraph
     in
 	    if !changed then iterLiveInOutMap (newInMap,newOutMap)
 	    else newOutMap
@@ -103,9 +102,9 @@ fun interferenceGraph flowgraph =
     val liveOutMap : liveMap = iterLiveInOutMap ((Init_map()), (Init_map()))
      
    fun moveEdge flowgraph = 
-   let fun moveEdgeHelper (node,anslist) = if (#ismove node) then 
-         let val definode = searchTempTable(List.hd (#def node))
-           val useinode = searchTempTable(List.hd (#use node))
+   let fun moveEdgeHelper (node as F.Node{def,use,ismove,...},anslist) = if (ismove) then 
+         let val definode = searchTempTable(List.hd def)
+           val useinode = searchTempTable(List.hd use)
          in if isSome(List.find (fn (inode1,inode2) => (inode1 = definode) andalso (inode2 = useinode)) anslist) then anslist else (definode,useinode)::anslist
          end 
        else anslist 
@@ -113,11 +112,12 @@ fun interferenceGraph flowgraph =
      foldl moveEdgeHelper [] flowgraph
    end
 
-    fun inodeEdge (node as F.Node{def,liveout,...}) : tempEdge list = 
+    fun inodeEdge (node as F.Node{id,def,...}) : tempEdge list = 
     let
-        fun iterOut d = foldl (fn (out, l) => if d <> out then {src:d,dst:out}::l else l) nil liveout
+        val liveout = S.listItems (lookTable (liveOutMap, id))
+        fun iterOut d = foldl (fn (out, l) => if d <> out then {src=d,dst=out}::l else l) nil liveout
     in
-        foldl (fn (d) => (iterOut d) @ ll) nil def
+        foldl (fn (d,ll) => (iterOut d) @ ll) nil def
     end
 
     val allEdges : tempEdge list = foldl (fn (n, l) => inodeEdge(n) @ l) nil flowgraph
@@ -131,7 +131,7 @@ in
             val dst_inode as NODE{adj=dst_adj,...} = searchTempTable(dst)
         in
             if List.exists (fn x => x=dst_inode) (!src_adj)
-            andalso List.exists (fn x => y=src_inode) (!dst_adj)
+            andalso List.exists (fn x => x=src_inode) (!dst_adj)
             then
                 ()
             else
@@ -141,5 +141,6 @@ in
                 end
         end
     ) allEdges;
-    IGRAPH{graph=TT.listItems(tempmap), moves=moveEdge(flowgraph)}
+    IGRAPH{graph=IntBinaryMap.listItems(!tempmap), moves=moveEdge(flowgraph)}
+end
 end
