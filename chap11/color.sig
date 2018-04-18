@@ -5,5 +5,5 @@ sig
   val color : {interference : Liveness.igraph,
                initial : allocation,
                registers : Frame.register list}
-              -> allocation * Temp.temp list
+              -> allocation
 end
