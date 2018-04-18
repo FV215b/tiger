@@ -8,4 +8,4 @@ structure Tr = Tree
 
 type allocation = Frame.register T.Table.table
 
-fun alloc (instrs,frame) : A.instr list * allocation = ()
+fun alloc (instrs) : A.instr list * allocation = ()
