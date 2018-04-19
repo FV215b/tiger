@@ -1,3 +1,4 @@
+
 There are 2 sml files and 2 sig files we implemented in this phase. They are :
 color.sml color.sig regalloc.sml regalloc.sig
 We only implemented simplify part without coalescing and spilling. So the interface is differnt from the book. 
@@ -8,4 +9,3 @@ since we dont spill.
 In Regalloc.alloc, it puts everything in Flow, Liveness and Color together. It taks a Assem.instr list and then produce
 a allocation. 
 Notice that we don't take Frame.frame since we don't rewrite the program.
-
