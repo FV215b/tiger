@@ -35,8 +35,8 @@ type allocation = Frame.register TT.table
 
 (* coloring function *)
 fun color{interference = L.IGRAPH{graph,moves},
-          initial=initAlloc, registers} = ()
-    let
+          initial=initAlloc, registers} = 
+let
         val lgraph = graph
         val stack : ref L.inode list
         val degreemap : ref TT.empty
@@ -60,4 +60,35 @@ fun color{interference = L.IGRAPH{graph,moves},
                     | NONE => (DecreaseDegree(findnode); stack := findnode::(!stack); livenessgraph = List.filter (fn x => x <> findnode) livenessgraph; Simplify(livenessgraph, alloc))
                 )
                 | NONE => if List.length livenessgraph > 0 then ErrorMsg.impossible("Can't allocate registers" else ())
+
+	    fun assignColor (stack, initial, registers) = 
+	        case stack of
+	            nil =>!initial
+	            | (n as L.inode{temp=t, adj=adjs,...})::nl =
+	            let
+	                fun findColor (m as L.inode{temp = tmp, ...}, colors) =
+	                    case TT.look(!initial, ntmp) of 
+	                        SOME color =>
+	                            if RS.member(cset, c)
+	                            then RS.delete(cset, c)
+	                            else cset
+	                val okColors = List.foldl findColor (RS.addList(RS.empty,registers)) (!adjs)
+	            in
+	                stack := ns;
+	                if RS.isEmpty(okColors)
+	                then ErrorMsg.impossible("Can't allocate registers"
+	                else
+	                    let 
+                            val c = List.hd(RS.listItems(okColors))
+	                    in 
+                            initial := TT.enter(!initial, t, c)
+	                    end;
+	             assignColors(stack, initial, registers)
+                end
+        
+	val colorStack = Simplify(lgraph,initAlloc)
+	val regAllocation = AssignColors (colorStack,initAlloc,registers)
+in
+    regAllocation
+end
 
