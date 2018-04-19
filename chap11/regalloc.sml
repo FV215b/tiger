@@ -1,7 +1,7 @@
 structure RegAlloc : REG_ALLOC =
 struct
 structure A = Assem
-structure Frame = MipsFrame
+structure Frame = Frame
 structure T = Temp
 structure TT = T.Table
 structure Tr = Tree
@@ -17,4 +17,5 @@ let
      (* do we need to union the map of initial and regAllocation? *)
 
 in (instrs,regAllocation)
+end
 end

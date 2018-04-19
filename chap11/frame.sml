@@ -78,9 +78,9 @@ structure Frame : FRAME = struct
 			SOME(v) => v
 			| NONE => Temp.makestring t
 	
-	(* val registers = map (fn (t) => case Temp.Table.look(tempMap, t) of 
+	 val registers = map (fn (t) => case Temp.Table.look(tempMap, t) of 
 							SOME(v) => v
-							) (specialregs @ argregs @ calleesaves @ callersaves) *)
+							) (specialregs @ argregs @ calleesaves @ callersaves) 
 
     fun exp (InFrame f)= (fn (temp) => Tree.MEM(Tree.BINOP(Tree.PLUS, temp, Tree.CONST f)))
 			| exp (InReg temp) = (fn (_) => Tree.TEMP temp)

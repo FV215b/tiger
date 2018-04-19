@@ -19,7 +19,7 @@ type ord_key = Temp.temp
 fun compare (t1,t2) = String.compare(Temp.makestring t1,Temp.makestring t2)
 end
 
-structure Liveness :> LIVENESS =
+structure Liveness : LIVENESS =
 struct
 
 datatype inode = NODE of {temp: Temp.temp,
