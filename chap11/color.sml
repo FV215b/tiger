@@ -34,6 +34,30 @@ structure T = Temp
 type allocation = Frame.register TT.table
 
 (* coloring function *)
-fun color{interference = Liveness.IGRAPH{graph,moves},
+fun color{interference = L.IGRAPH{graph,moves},
           initial=initAlloc, registers} = ()
+    let
+        val lgraph = graph
+        val stack : ref L.inode list
+        val degreemap : ref TT.empty
+        fun DecreaseDegree (node as L.NODE{temp,adj}) = 
+        let 
+            fun ddHelper (onenode as L.NODE{temp=oneTemp,adj=oneAdj}) = 
+            case TT.look(!degreemap, oneTemp) of 
+                SOME num => degreemap := TT.enter(!degreemap, oneTemp, num-1)
+                | NONE => degreemap := TT.enter(!degreemap, oneTemp, (List.length !oneAdj)-1)
+        in
+            app ddHelper !adj
+        end
+        fun LookupDegree (node as L.NODE{temp,adj}) : bool = 
+            case TT.look(!degreemap, temp) of
+                SOME num => num < (List.length registers)
+                | NONE => (degreemap := TT.enter(!degreemap, temp, (List.length !adj)); (List.length !adj) < (List.length registers))
+        fun Simplify (livenessgraph, alloc) : () = 
+            case List.find LookupDegree livenessgraph of
+                SOME (findnode as L.NODE{temp,adj}) => (case TT.look(alloc, temp) of
+                    SOME _ => (livenessgraph = List.filter (fn x => x <> findnode) livenessgraph; Simplify(livenessgraph, alloc))
+                    | NONE => (DecreaseDegree(findnode); stack := findnode::(!stack); livenessgraph = List.filter (fn x => x <> findnode) livenessgraph; Simplify(livenessgraph, alloc))
+                )
+                | NONE => if List.length livenessgraph > 0 then ErrorMsg.impossible("Can't allocate registers" else ())
 
