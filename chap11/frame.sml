@@ -124,10 +124,7 @@ structure Frame : FRAME = struct
 				src=[ZERO,RA,SP]@calleesaves,
 				dst=[],jump=SOME[]}]
 
-	fun procEntryExit3 ({name, formals, locals, instrs}:frame, body) =
-		{prolog = "PROCEDURE " ^ Symbol.name name ^ "\n",
-			body = body,
-			epilog = "END " ^ Symbol.name name ^ "\n"}
+
 
 
 end
