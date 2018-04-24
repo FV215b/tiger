@@ -116,7 +116,19 @@ structure Frame : FRAME = struct
 	
 	fun externalCall (str, args) = Tree.CALL(Tree.NAME(Temp.namedlabel str), args)	
 
-	fun procEntryExit1 (frame: frame, body: Tree.stm) = body
+    fun seq nil = Tree.EXP(Tree.CONST 0)
+    | seq [stm] = stm
+    | seq (stm::stml) = Tree.SEQ(stm,seq(stml))
+
+	fun procEntryExit1 (frame: frame, body: Tree.stm) =
+    let
+        val args = #instrs frame
+        val pairs =  map (fn r => (allocLocal frame false,r)) (RA::calleesaves)
+        val saves = map (fn (a,r) => Tree.MOVE(exp a (Tree.TEMP FP),Tree.TEMP r)) pairs
+        val restores = map (fn (a,r) => Tree.MOVE(Tree.TEMP r,exp a (Tree.TEMP FP))) (List.rev pairs)
+    in 
+        seq(args @ saves @ [body] @ restores)
+    end
 
 	fun procEntryExit2 (frame, body) =
 		body @
@@ -124,7 +136,19 @@ structure Frame : FRAME = struct
 				src=[ZERO,RA,SP]@calleesaves,
 				dst=[],jump=SOME[]}]
 
-
-
-
+    fun procEntryExit3 ({name,formals,locals,instrs},body) =
+    let 
+        val offset = (!locals + (List.length argregs))*wordSize 
+    in
+        {prolog=Symbol.name name ^ ":\n" ^
+              "\tsw\t$fp\t0($sp)\n" ^ (* save old FP *)
+              "\tmove\t$fp\t$sp\n" ^ (* make SP to be new FP *)
+              "\taddiu\t$sp\t$sp\t-" ^ Int.toString(offset) ^ "\n" (* make new SP *),
+        body = body,
+        epilog = "\tmove\t$sp\t$fp\n" ^ (* restore old SP *)
+              "\tlw\t$fp\t0($sp)\n" ^ (* restore old FP *)
+              "\tjr\t$ra\n\n" (* jump to return address *)
+        }
+    end
 end
+
