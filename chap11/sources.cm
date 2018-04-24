@@ -27,6 +27,7 @@ graph.sig
 graph.sml
 liveness.sml
 makegraph.sml
+main.sml
 
 
 $/basis.cm

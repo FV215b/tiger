@@ -11,7 +11,6 @@ let
     val stms' = Canon.traceSchedule(Canon.basicBlocks stms)
     val instrs = List.concat(map (MipsGen.codegen frame) stms')
     val instrs2 = Frame.procEntryExit2 (frame,instrs)
-	val format1 = Assem.format(Frame.temp_name)
     val (instrs2',alloc) = RegAlloc.alloc(instrs2,frame)
 in 
     (instrs2'::ilists,alloc::alist)
