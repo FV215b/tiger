@@ -1,8 +1,10 @@
 Group is
 
-semant.sml
+env.sml
+types.sml
 translate.sml
-main.sml
+semant.sml
+absyn.sml
 color.sig
 color.sml
 regalloc.sig

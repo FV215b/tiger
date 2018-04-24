@@ -3,17 +3,39 @@ signature TRANSLATE = sig
     type level
     type access (* not the same as Frame.access *)
     type exp
+    type frag
 
     val outermost: level
     val newLevel: {parent: level, name: Temp.label, formals: bool list} -> level
     val formals: level -> access list
     val allocLocal: level -> bool -> access
+    val procEntryExit: level * exp -> unit
+    val assign : exp * exp -> exp
+    val simpleVar : access * level -> exp
+    val fieldVar : exp * int -> exp
+    val subscriptVar : exp * exp -> exp
+    val relop : exp * Absyn.oper * exp -> exp
+    val binop : exp * Absyn.oper *  exp -> exp
+    val nilexp : exp
+    val letexp : exp list * exp -> exp
+    val intexp : int -> exp
+    val strexp : string -> exp
+    val recordExp : exp list -> exp
+    val sequence : exp list -> exp
+    val ifexp : exp * exp * exp option -> exp
+    val loop : exp * exp * Temp.label -> exp
+    val break : Temp.label -> exp
+    val array : exp * exp -> exp
+    val call : level * level * Temp.label * exp list * bool -> exp
+    val errorexp: exp
+    val reset : unit -> unit
+    val getResult : unit -> frag list
 end
 
 structure Translate : TRANSLATE =
 struct
 
-    structure Frame : FRAME = Frame
+    structure F : FRAME = Frame
 
     structure T = Tree
     
@@ -24,9 +46,18 @@ struct
     datatype level = Top
                    | Level of {parent: level, frame: Frame.frame, count: unit ref}
 
-    type access = level * Frame.access
 
+    type access = level * Frame.access
+    type frag = F.frag
+    
+    val errorexp = Ex(T.CONST 0)
     val outermost = Top
+
+    val fragments : frag list ref = ref nil
+
+    fun reset () = fragments := nil
+
+    fun getResult () = !fragments
 
     fun newLevel {parent, name, formals} = 
         Level {parent = parent,
@@ -40,10 +71,10 @@ struct
                let val formals = tl (Frame.formals frame) in
       (map (fn (x) => (level,x)) formals) end
 
-    fun allocLocal level escape = 
+    fun allocLocal (level:level) escape = 
         case level of
             Top => ErrorMsg.impossible "Allocation of local varible at Top level"
-          | _ => (level, Frame.allocLocal (#frame level) escape)
+          | Level{parent,frame,count} => (level, Frame.allocLocal (frame) escape)
 
     fun seq stms = 
         case stms of
@@ -64,9 +95,9 @@ struct
       | unEx (Nx n) = T.ESEQ(n, T.CONST 0)
 
     fun unCx(Cx c) = c
+      | unCx(Ex (T.CONST 0)) = (fn(t,f) => T.JUMP(T.NAME f, [f]))
+      | unCx(Ex (T.CONST 1)) = (fn(t,f) => T.JUMP(T.NAME t, [t]))
       | unCx(Ex e) = (fn (t, f) => T.CJUMP(T.NE, e, T.CONST 0, t, f))
-      | unCx(Ex (T.CONST 0)) = (fn(t,f) => JUMP(T.NAME f, [f]))
-      | unCx(Ex (T.CONST 1)) = (fn(t,f) => JUMP(T.NAME t, [t]))
       | unCx(Nx _) = ErrorMsg.impossible "unCx cannot get Nx"
 
     fun unNx(Nx n) = n
@@ -75,10 +106,10 @@ struct
             let val t = Temp.newlabel() and f = Temp.newlabel ()
             in seq[c(t,f),
                    T.LABEL t,
-                   T.LEBEL f]
+                   T.LABEL f]
             end
 
-    fun nilexp = Ex(T.CONST(0))
+    val nilexp = Ex(T.CONST(0))
 
     fun intexp i = Ex(T.CONST(i))
 
@@ -94,26 +125,26 @@ struct
 	     NONE => let val nlbl = Temp.newlabel() in
 	         (fragments := F.STRING(nlbl,s) :: !fragments; Ex(T.NAME(nlbl))) end
 	         (*find nothing, create one *)
-	   | SOME(F.STRING(lbl,_)) => Ex(T.NAME(lab)) (* find same string, reuse it *)
+	   | SOME(F.STRING(lbl,_)) => Ex(T.NAME(lbl)) (* find same string, reuse it *)
     end
     
-    fun call (_,Lev({parent=Top,...},_),label,exps,isProc) : exp = 
+    fun call (_,Level{parent=Top,...},label,exps,isProc) : exp = 
 	    if isProc
 	    then Nx(T.EXP(F.externalCall(Symbol.name label,map unEx exps)))
 	    else Ex(F.externalCall(Symbol.name label,map unEx exps))
 	(* if is externalcall *) 
-	  | call (uselevel,deflevel,label,exps,isprocedure) : exp =
+	  | call (uselevel,deflevel,label,exps,isProc) : exp =
 	    let
 	      fun depth level =
 	            case level of
 	              Top => 0
-	            | Lev({parent,...},_) => 1 + depth(parent)
+	            | Level{parent,...} => 1 + depth(parent)
 	      val diff = depth uselevel - depth deflevel + 1 
 	      fun getStaticLink (diff,level) =
 	          if diff = 0 then T.TEMP Frame.FP
 	          else
-	            let val Lev({parent,frame},_) = level in
-	              Frame.getData(hd(Frame.getFormals frame))(getStaticLink(diff-1,parent))
+	            let val Level{parent,frame,...} = level in
+	              Frame.exp(hd(Frame.formals frame))(getStaticLink(diff-1,parent))
 	              (* get the static link of one level up *)
 	            end
 	      val ans = T.CALL(T.NAME label,(getStaticLink(diff,uselevel)) :: (map unEx exps))
@@ -126,35 +157,35 @@ struct
         let val left = unEx(l)
             val right = unEx(r)
             val bop = case oper of
-                            Abysn.PlusOp => T.PLUS
-                          | Abysn.MinusOp => T.MINUS
-                          | Abysn.TimesOp => T.MUL
-                          | Abysn.DivideOp => T.DIV
+                            Absyn.PlusOp => T.PLUS
+                          | Absyn.MinusOp => T.MINUS
+                          | Absyn.TimesOp => T.MUL
+                          | Absyn.DivideOp => T.DIV
         in Ex(T.BINOP(bop, left, right))
         end
 
-    fun relop (l, oper, r) =
+    fun relop (e1, oper, e2) =
         let val left = unEx(e1)
             val right = unEx(e2)
-                val rop = case oper of Abysn.EqOp => T.EQ
-                                     | Abysn.NeqOp => T.NE
-                                     | Abysn.LtOp => T.LT
-                                     | Abysn.LeOp => T.LE
-                                     | Abysn.GtOp => T.GT
-                                     | Abysn.GeOp => T.GE
-        in Cx((fn (t,f) => T.CJUMP(treeop, left, right, t, f))) 
+                val rop = case oper of Absyn.EqOp => T.EQ
+                                     | Absyn.NeqOp => T.NE
+                                     | Absyn.LtOp => T.LT
+                                     | Absyn.LeOp => T.LE
+                                     | Absyn.GtOp => T.GT
+                                     | Absyn.GeOp => T.GE
+        in Cx((fn (t,f) => T.CJUMP(rop, left, right, t, f))) 
         end
 
-    fun simpleVar (varaccess, curlevel) =
+    fun simpleVar (varaccess, currentlevel as Level{parent=cparent,count=ccount,frame=cframe}) =
         let val (Level varlevel, varacc) = varaccess
             fun iter (currentlevel, acc) =
-                if (#count varlevel = #count currentlevel) 
-                then Frame.getData(varacc)(acc)
+                if (#count varlevel = ccount) 
+                then Frame.exp(varacc)(acc)
                 else 
-                    let val staticlink = hd(Frame.getFormals #frame currentlevel)
-                    in iter(#parent currentlevel, Frame.getData(staticlink)(acc))
+                    let val staticlink = hd(Frame.formals cframe)
+                    in iter(cparent, Frame.exp(staticlink)(acc))
                     end
-        in Ex(iter(curlevel,T.TEMP(Frame.FP))) 
+        in Ex(iter(currentlevel,T.TEMP(Frame.FP))) 
         end
 
     fun subscriptVar (arrayexp, subscriptexp)=
@@ -163,32 +194,32 @@ struct
     fun fieldVar (recordexp, fieldnumber) =
         Ex(T.MEM(T.BINOP(T.PLUS,unEx(recordexp), T.CONST(fieldnumber*Frame.wordSize))))
 
-    fun ifexp(testexp, thenexp, elseexp: exp option): exp = 
+    fun ifexp(testexp, thenexp, elseexp: exp option)= 
         let val condFn = unCx testexp
             val thenExp = unEx thenexp
-            val elseExp = if isSome elseexp then SOME(unEx valOf(elseexp)) else NONE
+            val elseExp = if isSome elseexp then SOME(unEx (valOf(elseexp))) else NONE
             val tlabel = Temp.newlabel()
             val flabel = Temp.newlabel()
             val ans = Temp.newtemp()
             val endlabel = Temp.newlabel()
         in if isSome(elseExp) then
-           ESEQ(seq[condFn(tlabel,flabel),
+          Ex( T.ESEQ(seq[condFn(tlabel,flabel),
                 T.LABEL tlabel,
-                T.MOVE(T.TEMP ans,thanExp),
-                JUMP(T.NAME(endlabel),[endlabel]),
-                T.LABEL flabel
+                T.MOVE(T.TEMP ans,thenExp),
+                T.JUMP(T.NAME(endlabel),[endlabel]),
+                T.LABEL flabel,
                 T.MOVE(T.TEMP ans, valOf (elseExp)),
                 T.LABEL endlabel
-                ],T.TEMP ans)
-          else 
-            ESEQ(seq[condFn(tlabel,flabel),
+                ],T.TEMP ans))
+         else 
+            Ex(T.ESEQ(seq[condFn(tlabel,flabel),
               T.LABEL tlabel,
-              T.MOVE(T.TEMP ans,thanExp),
-              JUMP(T.NAME(endlabel),[endlabel]),
-              T.LABEL flabel
+              T.MOVE(T.TEMP ans,thenExp),
+              T.JUMP(T.NAME(endlabel),[endlabel]),
+              T.LABEL flabel,
               T.MOVE(T.TEMP ans, T.CONST 0),
               T.LABEL endlabel
-                ],T.TEMP ans)
+                ],T.TEMP ans))
         end
 
     fun recordExp fieldExps =
@@ -234,21 +265,23 @@ struct
     						val lastexp = List.last(exps) in
     					    case lastexp of
                                  Nx(s) => Nx(T.SEQ(restexp,s))
-           				       | _ => Ex(T.ESEQ(restexp,unEx(last)))
+           				       | _ => Ex(T.ESEQ(restexp,unEx(lastexp)))
         			    end
         			   
     
    fun letexp(decs,body) = 
        case decs of 
-         [] => unEx(body)
+         [] => Ex(unEx(body))
       | decs => Ex(T.ESEQ(seq (map unNx decs),unEx(body)))
 
 
-fun procEntryExit (Lev({frame,...},_),body) =
+fun procEntryExit (Level({frame,...}),body) =
+    
     let val body' =
             Frame.procEntryExit1(frame,T.MOVE(T.TEMP Frame.RV,unEx(body)))
     in fragments := Frame.PROC{frame=frame,body=body'} :: !fragments
     end
+    
 end
 
 

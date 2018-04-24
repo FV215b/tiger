@@ -4,7 +4,7 @@ structure Tr = Translate
 structure F = Frame
 structure A = Assem
 
-fun procHandler (proc,(ilist,alist))                            
+fun procHandler (proc,(ilist,alist))  =                          
 let                              
     val (body,frame) = case proc of F.PROC{bdy,frm} => (bdy,frm)
     val stms = Canon.linearize body
@@ -18,7 +18,7 @@ in
 end
 
 
-fun main filename
+fun main filename =
 let val absyn = Parse.parse filename
     val frags = Semant.transProg absyn
     val procs =

@@ -116,7 +116,7 @@ structure Frame : FRAME = struct
 	
 	fun externalCall (str, args) = Tree.CALL(Tree.NAME(Temp.namedlabel str), args)	
 
-	fun procEntryExit1 {frame: frame, body: Tree.stm} = body
+	fun procEntryExit1 (frame: frame, body: Tree.stm) = body
 
 	fun procEntryExit2 (frame, body) =
 		body @
