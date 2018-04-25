@@ -14,12 +14,11 @@ fun prtString (lab,str) = S.name lab ^ ": .asciiz \"" ^ str ^ "\"\n"
 
 fun procHandler out proc  =                          
 let                              
-    val (body,frame) = case proc of F.PROC{bdy,frm} => (bdy,frm)
+    val (body,frame) = case proc of F.PROC{body,frame} => (body,frame)
     val stms = Canon.linearize body
     val stms' = Canon.traceSchedule(Canon.basicBlocks stms)
     val instrs = List.concat(map (MipsGen.codegen frame) stms')
     val instrs2 = Frame.procEntryExit2 (frame,instrs)
-	val format1 = Assem.format(Frame.temp_name)
     val (instrs2',alloc) = RegAlloc.alloc(instrs2,frame)
     val {prolog,body,epilog} = Frame.procEntryExit3(frame,instrs2')
     fun instrPrint instr = TextIO.output(out,(Assem.format(tempalloc alloc) instr) ^ "\n")

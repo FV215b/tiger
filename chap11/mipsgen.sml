@@ -1,7 +1,7 @@
-structure MipsGen :> CODEGEN =
+structure MipsGen : CODEGEN =
 struct
 
-structure Frame : FRAME = Frame
+structure Frame = Frame
 structure A = Assem
 structure T = Tree
 

@@ -27,7 +27,7 @@ graph.sig
 graph.sml
 liveness.sml
 makegraph.sml
-main.sml
+CompilerMain.sml
 prabsyn.sml
 parse.sml
 tiger.lex
