@@ -19,22 +19,22 @@ let
     val stms' = Canon.traceSchedule(Canon.basicBlocks stms)
     val instrs = List.concat(map (MipsGen.codegen frame) stms')
     val instrs2 = Frame.procEntryExit2 (frame,instrs)
-    val (instrs2',alloc) = RegAlloc.alloc(instrs2,frame)
+    val (instrs2',alloc) = RegAlloc.alloc instrs2
     val {prolog,body,epilog} = Frame.procEntryExit3(frame,instrs2')
     fun instrPrint instr = TextIO.output(out,(Assem.format(tempalloc alloc) instr) ^ "\n")
 in 
     TextIO.output(out,prolog);
-	app instrPrint instrs'';
+	app instrPrint body;
     TextIO.output(out,epilog)
 end
 
-fun strHandler out (str as F.STRING(lab,str))= TextIO.output(out,prtString(lab,str))
+fun strHandler out (F.STRING(lab,str))= TextIO.output(out,prtString(lab,str))
 
 fun main filename =
 let val absyn = Parse.parse filename
     val frags = Semant.transProg absyn
     val (procs,strs) =
-            List.filter
+            List.partition
                 (fn (x) => case x of
                                F.PROC(_) => true
                              | _ => false) frags
@@ -44,7 +44,7 @@ in
     TextIO.output(out,"\t.data\n");
 	app (strHandler out) strs;
 	TextIO.output(out,"\n\t.text\n");
-    app (procHandler out) progs
+    app (procHandler out) procs
 end
                                                           
 end                        
