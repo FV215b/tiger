@@ -67,6 +67,7 @@ let
 	                            if RS.member(cset, color)
 	                            then RS.delete(cset, color)
 	                            else cset
+                        | None => (cset)
 	                val okColors = List.foldl findColor (RS.addList(RS.empty,registers)) (!adjs)
 	            in
 	                stack := nl;
