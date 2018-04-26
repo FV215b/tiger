@@ -40,13 +40,11 @@ let
                     (let
                         val _ = TextIO.print(Temp.makestring temp)
                         val livenessgraph' = List.filter (fn (x as L.NODE{temp=temp',adj=adj'}) => temp' <> temp) livenessgraph
-                        val _ = TextIO.print("b")
                     in
                         Simplify(livenessgraph', alloc)
                     end)
                     | NONE =>
                     (let
-                        val _ = TextIO.print("c")
                         val livenessgraph' = List.filter (fn (x as L.NODE{temp=temp',adj=adj'}) => temp' <> temp) livenessgraph
                     in
                         DecreaseDegree(findnode);
@@ -82,9 +80,7 @@ let
 	             assignColor(initial, registers)
               end
 in
-    TextIO.print("0");	
     Simplify(lgraph,initAlloc);
-    TextIO.print("1");
     assignColor (ref initAlloc,registers)
 end
 end
