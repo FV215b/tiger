@@ -90,8 +90,7 @@ exp
 
 lvalue
   : ID                   (A.SimpleVar (Symbol.symbol ID, IDleft))
-  | lvalue DOT ID        (A.FieldVar (lvalue, Symbol.symbol ID, lvalueleft))
-  | lvalue LBRACK exp RBRACK         (A.SubscriptVar (lvalue, exp, lvalueleft))
+  | lvalue_not_id        (A.VarExp lvalue_not_id) 
 
 optional_exp
   :                      (A.SeqExp)
