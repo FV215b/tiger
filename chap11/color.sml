@@ -38,7 +38,6 @@ let
                 SOME (findnode as L.NODE{temp,adj}) => (case TT.look(alloc, temp) of
                     SOME _ => 
                     (let
-                        val _ = TextIO.print(Temp.makestring temp)
                         val livenessgraph' = List.filter (fn (x as L.NODE{temp=temp',adj=adj'}) => temp' <> temp) livenessgraph
                     in
                         Simplify(livenessgraph', alloc)

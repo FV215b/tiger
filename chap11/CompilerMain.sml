@@ -21,10 +21,10 @@ let
     val instrs2 = Frame.procEntryExit2 (frame,instrs)
     val (instrs2',alloc) = RegAlloc.alloc instrs2
     val {prolog,body,epilog} = Frame.procEntryExit3(frame,instrs2)
-    fun instrPrint instr = TextIO.output(out,(Assem.format(Frame.tempToString) instr) ^ "\n")
+    fun instrPrint instr = TextIO.output(out,(Assem.format(tempalloc alloc) instr) ^ "\n")
 in 
     TextIO.output(out,prolog);
-	app instrPrint instrs;
+	app instrPrint body;
     TextIO.output(out,epilog)
 end
 
@@ -38,14 +38,14 @@ let val absyn = Parse.parse filename
                 (fn (x) => case x of
                                F.PROC(_) => true
                              | _ => false) frags
-    (* val out = TextIO.openOut (filename ^ ".s") *)
+    val out = TextIO.openOut (filename ^ ".s") 
 in 
-    TextIO.output(TextIO.stdOut,"\t.globl main\n");
-    TextIO.output(TextIO.stdOut,"\t.data\n");
-	app (strHandler TextIO.stdOut) strs;
-	TextIO.output(TextIO.stdOut,"\n\t.text\n");
-    app (procHandler TextIO.stdOut) procs;
-    TextIO.output(TextIO.stdOut,"\t.end\n");
+    TextIO.output(out,"\t.globl main\n");
+    TextIO.output(out,"\t.data\n");
+	app (strHandler out) strs;
+	TextIO.output(out,"\n\t.text\n");
+    app (procHandler out) procs;
+	TextIO.closeOut out;
     ()
 end
                                                           
