@@ -6,7 +6,7 @@ main:
 	sw	$fp	0($sp)
 	move	$fp	$sp
 	addiu	$sp	$sp	-20
-L11:
+L8:
 sw $fp, 4($a0)
 move $t1, $ra
 move $t0, $s0
@@ -21,13 +21,13 @@ li $a0, 3
 sw $fp, -4($a0)
 lw $a1, -4($fp)
 li $a0, 3
-blt $a1, $a0, L7
-b L8
-L8:
+blt $a1, $a0, L4
+b L5
+L5:
 lw $a0, -4($fp)
 addiu $a0, $a0, -3
 move $a0, $a0
-L9:
+L6:
 move $rv, $a0
 move $s7, $a2
 move $s6, $a3
@@ -38,11 +38,11 @@ move $s2, $ra
 move $s1, $s0
 move $s0, $t0
 move $ra, $t1
-b L10
-L7:
+b L7
+L4:
 lw $a0, -4($fp)
-b L9
-L10:
+b L6
+L7:
 
 	move	$sp	$fp
 	lw	$fp	0($sp)

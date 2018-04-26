@@ -4,7 +4,6 @@ struct
     let
       val syntaxTree = Parse.parse filename
     in
-      PrintAbsyn.print syntaxTree;
-      ()
+      PrintAbsyn.print (TextIO.stdOut, syntaxTree)
     end
 end
