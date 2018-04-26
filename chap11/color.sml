@@ -3,28 +3,6 @@ struct
 
 structure L = Liveness
 structure Frame = Frame
-(*
-structure NS = BinarySetFn(
-  type ord_key = LI.node
-  fun compare(LI.NODE{temp=t1,...},LI.NODE{temp=t2,...})
-      = String.compare(Temp.makestring t1,Temp.makestring t2))
-
-structure MS = BinarySetFn(
-  type ord_key = LI.node*LI.node
-  fun compare((LI.NODE{temp=t1,...},
-                LI.NODE{temp=t2,...}),
-               (LI.NODE{temp=t1',...},
-                LI.NODE{temp=t2',...})) =
-    case String.compare(Temp.makestring t1,Temp.makestring t1') of
-      EQUAL => String.compare(Temp.makestring t2,Temp.makestring t2')
-     | od => od)
-
-structure RS = ListSetFn(
-    type ord_key = Frame.register
-    fun compare (r1,r2) = String.compare(r1,r2))
-
-structure WL = NS
-*)
 structure RS = ListSetFn(
     type ord_key = Frame.register
     fun compare (r1,r2) = String.compare(r1,r2))
@@ -55,16 +33,29 @@ let
             case TT.look(!degreemap, temp) of
                 SOME num => num < (List.length registers)
                 | NONE => (degreemap := TT.enter((!degreemap), temp, (List.length (!adj))); (List.length (!adj)) < (List.length registers))
-        fun Simplify (livenessgraph, alloc)= 
+        fun Simplify (livenessgraph, alloc) =
             case List.find LookupDegree livenessgraph of
                 SOME (findnode as L.NODE{temp,adj}) => (case TT.look(alloc, temp) of
-                    SOME _ => (livenessgraph = List.filter (fn x => x <> findnode) livenessgraph; Simplify(livenessgraph, alloc))
-                    | NONE => (DecreaseDegree(findnode); stack := findnode::(!stack); livenessgraph = List.filter (fn x => x <> findnode) livenessgraph; Simplify(livenessgraph, alloc))
-                )
+                    SOME _ => 
+                    (let
+                        val _ = TextIO.print(Temp.makestring temp)
+                        val livenessgraph' = List.filter (fn (x as L.NODE{temp=temp',adj=adj'}) => temp' <> temp) livenessgraph
+                        val _ = TextIO.print("b")
+                    in
+                        Simplify(livenessgraph', alloc)
+                    end)
+                    | NONE =>
+                    (let
+                        val _ = TextIO.print("c")
+                        val livenessgraph' = List.filter (fn (x as L.NODE{temp=temp',adj=adj'}) => temp' <> temp) livenessgraph
+                    in
+                        DecreaseDegree(findnode);
+                        stack := findnode::(!stack);
+                        Simplify(livenessgraph', alloc)
+                    end))
                 | NONE => 
                   if List.length livenessgraph > 0 
                   then ErrorMsg.impossible("Can't allocate registers") else ()
-
 	    fun assignColor ( initial, registers) = 
 	        case !stack of
 	            nil => (!initial)
@@ -89,10 +80,10 @@ let
 	                    end;
 	             assignColor(initial, registers)
               end
-        
-	
 in
+    TextIO.print("0");	
     Simplify(lgraph,initAlloc);
+    TextIO.print("1");
     assignColor (ref initAlloc,registers)
 end
 end

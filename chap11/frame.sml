@@ -123,20 +123,20 @@ structure Frame : FRAME = struct
 	fun procEntryExit1 (frame: frame, body: Tree.stm) =
     let
         val args = #instrs frame
-        val pairs =  map (fn r => (allocLocal frame false,r)) (RA::calleesaves)
+        val pairs = map (fn r => (allocLocal frame false,r)) (RA::calleesaves)
         val saves = map (fn (a,r) => Tree.MOVE(exp a (Tree.TEMP FP),Tree.TEMP r)) pairs
         val restores = map (fn (a,r) => Tree.MOVE(Tree.TEMP r,exp a (Tree.TEMP FP))) (List.rev pairs)
     in 
         seq(args @ saves @ [body] @ restores)
     end
 
-	fun procEntryExit2 (frame, body) =
+	fun procEntryExit2 (frame: frame, body: Assem.instr list) =
 		body @
 		[Assem.OPER{assem="",
 				src=[ZERO,RA,SP]@calleesaves,
 				dst=[],jump=SOME[]}]
 
-    fun procEntryExit3 ({name,formals,locals,instrs},body) =
+    fun procEntryExit3 ({name,formals,locals,instrs}, body) =
     let 
         val offset = (!locals + (List.length argregs))*wordSize 
     in

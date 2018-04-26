@@ -20,7 +20,10 @@ fun codegen (frame) (stm: Tree.stm): Assem.instr list =
 
 
         fun munchStm(T.SEQ(a, b)) = (munchStm(a); munchStm(b))
-
+          
+          | munchStm(T.LABEL lab) =
+            emit(A.LABEL{assem=Symbol.name(lab) ^ ":",lab=lab})
+          
           | munchStm(T.MOVE(T.MEM(T.BINOP(T.PLUS, e1, T.CONST i)), e2)) =
             emit(A.OPER{assem="sw `s0, " ^ int i ^ "(`s1)",
                         src=[munchExp e1, munchExp e2],
@@ -124,8 +127,6 @@ fun codegen (frame) (stm: Tree.stm): Assem.instr list =
                         src=[munchExp e1],
                         dst=[],
                         jump=SOME [l1,l2]})
-
-
 
           | munchStm (T.CJUMP(T.GE, e1, e2, l1, l2)) =
             emit(A.OPER{assem="bge `s0, `s1, `j0\nb `j1",
