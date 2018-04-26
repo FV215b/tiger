@@ -1,0 +1,5 @@
+let
+    var x := 3
+in
+    if x < 3 then x else x-3
+end
