@@ -1,30 +1,18 @@
 Group is
 
-absyn.sml
+frame.sig
+frame.sml
+errormsg.sml
+symbol.sml
+tree.sml
 assem.sml
 canon.sml
 codegen.sig
-env.sml
-errormsg.sml
-flowgraph.sml
-frame.sig
-frame.sml
-graph.sig
-graph.sml
-main.sml
 mipsgen.sml
-parse.sml
-prabsyn.sml
-printtree.sml
-semant.sml
-table.sig
-table.sml
 temp.sig
 temp.sml
-translate.sml
-tree.sml
-tiger.grm.sml
-symbol.sml
+table.sig
+table.sml
 
 $/basis.cm
 $/smlnj-lib.cm

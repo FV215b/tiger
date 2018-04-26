@@ -27,5 +27,5 @@ sig
 	val procEntryExit3 : frame * Assem.instr list -> {prolog: string, body: Assem.instr list, epilog: string}
 	val tempMap : register Temp.Table.table
 	val tempToString : Temp.temp -> string
-	val registers : register list
+	(* val registers : register list *)
 end

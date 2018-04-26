@@ -38,7 +38,7 @@ struct
             Top => []
            | Level {parent=parent,frame=frame,...}  =>
                let val formals = tl (Frame.formals frame) in
-      (map (fn (x) => (lev,x)) formals) end
+      (map (fn (x) => (level,x)) formals) end
 
     fun allocLocal level escape = 
         case level of

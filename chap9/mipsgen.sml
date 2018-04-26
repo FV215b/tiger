@@ -1,7 +1,7 @@
 structure MipsGen :> CODEGEN =
 struct
 
-structure Frame : FRAME = MipsFrame
+structure Frame : FRAME = Frame
 structure A = Assem
 structure T = Tree
 
@@ -11,6 +11,7 @@ fun codegen (frame) (stm: Tree.stm): Assem.instr list =
     let val ilist = ref (nil: A.instr list)
         fun emit x = ilist := x :: !ilist
         fun result(gen) = let val t = Temp.newtemp() in gen t; t end
+        val calldefs = [Frame.RV,Frame.RA]@Frame.argregs
 
         fun int n =
             if n >= 0 
@@ -31,12 +32,12 @@ fun codegen (frame) (stm: Tree.stm): Assem.instr list =
                         dst=[],jump=NONE})
 
           | munchStm(T.MOVE(T.MEM(T.BINOP(T.MINUS, e1, T.CONST i)), e2)) =
-            emit(A.OPER{assem="sw `s0, " ^ int (-1*i) ^ "(`s1)",
+            emit(A.OPER{assem="sw `s0, " ^ int (~i) ^ "(`s1)",
                         src=[munchExp e1, munchExp e2],
                         dst=[],jump=NONE})
 
           | munchStm(T.MOVE(T.MEM(T.BINOP(T.MINUS, T.CONST i, e1)), e2)) =
-            emit(A.OPER{assem="sw `s0, " ^ int (-1*i) ^ "(`s1)",
+            emit(A.OPER{assem="sw `s0, " ^ int (~i) ^ "(`s1)",
                         src=[munchExp e1, munchExp e2],
                         dst=[],jump=NONE})
 
@@ -45,7 +46,7 @@ fun codegen (frame) (stm: Tree.stm): Assem.instr list =
                         src=[munchExp e2, munchExp e1],
                         dst=[],jump=NONE})
 
-          (* TODO 2, load to register (lw) *)
+ 
           | munchStm(T.MOVE((T.TEMP i, T.CONST n))) =
             emit(A.OPER{assem="li `d0, " ^ int n,
                         src=[],
@@ -62,22 +63,20 @@ fun codegen (frame) (stm: Tree.stm): Assem.instr list =
                         dst=[i],jump=NONE})
 
           | munchStm(T.MOVE(T.TEMP i, T.MEM(T.BINOP(T.MINUS, e1, T.CONST n)))) =
-            emit(A.OPER{assem="lw `d0, " ^ int2str (-1*n) ^ "(`s0)",
+            emit(A.OPER{assem="lw `d0, " ^ int (~n) ^ "(`s0)",
                         src=[munchExp e1],
                         dst=[i],jump=NONE})
 
           | munchStm (T.MOVE(T.TEMP i, T.MEM(T.BINOP(T.MINUS, T.CONST n, e1)))) =
-            emit(A.OPER{assem="lw `d0, " ^ int2str (-1*n) ^ "(`s0)",
+            emit(A.OPER{assem="lw `d0, " ^ int (~n) ^ "(`s0)",
                         src=[munchExp e1],
                         dst=[i],jump=NONE})
 
-          (* TODO 3, move from register to register *)
           | munchStm (T.MOVE((T.TEMP i, e2))) =
             emit(A.MOVE{assem="move `d0, `s0",
                         src=munchExp e2,
                         dst=i})
-
-          (* TODO branching *)
+                        
           | munchStm(T.JUMP(T.NAME lab, _)) =
             emit(A.OPER{assem="b `j0",
                         src=[],
@@ -90,7 +89,6 @@ fun codegen (frame) (stm: Tree.stm): Assem.instr list =
                         dst=[],
                         jump=SOME(labels)})
 
-          (* TODO when comparing with 0 *)
           | munchStm(T.CJUMP(T.GE, e1, T.CONST 0, l1, l2)) =
             emit(A.OPER{assem="bgez `s0, `j0\nb `j1",
                         src=[munchExp e1],
@@ -127,7 +125,7 @@ fun codegen (frame) (stm: Tree.stm): Assem.instr list =
                         dst=[],
                         jump=SOME [l1,l2]})
 
-          (* TODO more general cases *)
+
 
           | munchStm (T.CJUMP(T.GE, e1, e2, l1, l2)) =
             emit(A.OPER{assem="bge `s0, `s1, `j0\nb `j1",
@@ -206,7 +204,6 @@ fun codegen (frame) (stm: Tree.stm): Assem.instr list =
 
           | munchStm (T.EXP e) = (munchExp e; ())
 
-        (* TODO memory ops *)
 
         and munchExp (T.MEM(T.CONST i)) =
             result(fn r => 
@@ -217,44 +214,41 @@ fun codegen (frame) (stm: Tree.stm): Assem.instr list =
 
           | munchExp (T.MEM(T.BINOP(T.PLUS, e1, T.CONST i))) =
             result(fn r => 
-                   emit(A.OPER{assem="lw `d0, " ^ int2str i ^ "(`s0)",
+                   emit(A.OPER{assem="lw `d0, " ^ int i ^ "(`s0)",
                                src=[munchExp e1],
                                dst=[r],
                                jump=NONE}))
 
           | munchExp (T.MEM(T.BINOP(T.PLUS, T.CONST i, e2))) =
             result(fn r => 
-                   emit(A.OPER{assem="lw `d0, " ^ int2str i ^ "(`s0)",
+                   emit(A.OPER{assem="lw `d0, " ^ int i ^ "(`s0)",
                                src=[munchExp e2],
                                dst=[r],
                                jump=NONE}))
 
           | munchExp (T.MEM(T.BINOP(T.MINUS, e1, T.CONST i))) =
             result(fn r => 
-                   emit(A.OPER{assem="lw `d0, " ^ int2str (~i) ^ "(`s0)",
+                   emit(A.OPER{assem="lw `d0, " ^ int (~i) ^ "(`s0)",
                                src=[munchExp e1],
                                dst=[r],
                                jump=NONE}))
 
           | munchExp (T.MEM(T.BINOP(T.MINUS, T.CONST i, e2))) =
             result(fn r => 
-                   emit(A.OPER{assem="lw `d0, " ^ int2str (~i) ^ "(`s0)",
+                   emit(A.OPER{assem="lw `d0, " ^ int (~i) ^ "(`s0)",
                                src=[munchExp e2],
                                dst=[r],jump=NONE}))
 
-          (* TODO binary operations *)
-
-          (* TODO 1, add/sub immediate *)
 
           | munchExp (T.BINOP(T.PLUS, e1, T.CONST i)) =
             result(fn r => 
-                   emit(A.OPER{assem="addiu `d0, `s0, " ^ int2str i,
+                   emit(A.OPER{assem="addiu `d0, `s0, " ^ int i,
                                src=[munchExp e1],
                                dst=[r],jump=NONE}))
 
           | munchExp (T.BINOP (T.PLUS, T.CONST i, e1)) =
             result(fn r => 
-                   emit(A.OPER{assem="addiu `d0, `s0, " ^ int2str i,
+                   emit(A.OPER{assem="addiu `d0, `s0, " ^ int i,
                                src=[munchExp e1],
                                dst=[r],jump=NONE}))
 
@@ -266,7 +260,7 @@ fun codegen (frame) (stm: Tree.stm): Assem.instr list =
 
           | munchExp (T.BINOP(T.MINUS, e1, T.CONST i)) =
             result(fn r => 
-                   emit(A.OPER{assem="addiu `d0, `s0, " ^ int2str (~i),
+                   emit(A.OPER{assem="addiu `d0, `s0, " ^ int (~i),
                                src=[munchExp e1],
                                dst=[r],jump=NONE}))
 
@@ -296,14 +290,14 @@ fun codegen (frame) (stm: Tree.stm): Assem.instr list =
 
           | munchExp (T.BINOP (T.AND, e1, T.CONST n)) =
             result(fn r => 
-                   emit(A.OPER{assem="andi `d0, `s0, " ^ int2str n,
+                   emit(A.OPER{assem="andi `d0, `s0, " ^ int n,
                                src=[munchExp e1],
                                dst=[r],
                                jump=NONE}))
 
           | munchExp (T.BINOP (T.AND, T.CONST n, e1)) =
             result(fn r => 
-                   emit(A.OPER{assem="andi `d0, `s0, " ^ int2str n,
+                   emit(A.OPER{assem="andi `d0, `s0, " ^ int n,
                                src=[munchExp e1],
                                dst=[r],
                                jump=NONE}))
@@ -319,14 +313,14 @@ fun codegen (frame) (stm: Tree.stm): Assem.instr list =
 
           | munchExp (T.BINOP (T.OR, e1, T.CONST n)) =
             result(fn r => 
-                   emit(A.OPER{assem="ori `d0, `s0, " ^ int2str n,
+                   emit(A.OPER{assem="ori `d0, `s0, " ^ int n,
                                src=[munchExp e1],
                                dst=[r],
                                jump=NONE}))
 
           | munchExp (T.BINOP (T.OR, T.CONST n, e1)) =
             result(fn r => 
-                   emit(A.OPER{assem="ori `d0, `s0, " ^ int2str n,
+                   emit(A.OPER{assem="ori `d0, `s0, " ^ int n,
                                src=[munchExp e1],
                                dst=[r],
                                jump=NONE}))
@@ -342,7 +336,7 @@ fun codegen (frame) (stm: Tree.stm): Assem.instr list =
 
           | munchExp (T.BINOP (T.LSHIFT, e, T.CONST n)) =
             result (fn r => 
-                    emit (A.OPER {assem="sll `d0, `s0, " ^ int2str n,
+                    emit (A.OPER {assem="sll `d0, `s0, " ^ int n,
                                   src=[munchExp e],
                                   dst=[r],
                                   jump=NONE}))
@@ -356,7 +350,7 @@ fun codegen (frame) (stm: Tree.stm): Assem.instr list =
 
           | munchExp (T.BINOP (T.RSHIFT, e, T.CONST n)) =
             result (fn r => 
-                    emit (A.OPER {assem="srl `d0, `s0, " ^ int2str n,
+                    emit (A.OPER {assem="srl `d0, `s0, " ^ int n,
                                   src=[munchExp e],
                                   dst=[r],
                                   jump=NONE}))
@@ -370,7 +364,7 @@ fun codegen (frame) (stm: Tree.stm): Assem.instr list =
 
           | munchExp (T.BINOP (T.ARSHIFT, e, T.CONST n)) =
             result (fn r => 
-                    emit (A.OPER {assem="sra `d0, `s0, " ^ int2str n,
+                    emit (A.OPER {assem="sra `d0, `s0, " ^ int n,
                                   src=[munchExp e],
                                   dst=[r],
                                   jump=NONE}))
@@ -384,7 +378,7 @@ fun codegen (frame) (stm: Tree.stm): Assem.instr list =
 
           | munchExp (T.CONST i) =
             result(fn r => 
-                   emit(A.OPER{assem="li `d0, " ^ int2str i,
+                   emit(A.OPER{assem="li `d0, " ^ int i,
                                src=[],
                                dst=[r],
                                jump=NONE}))

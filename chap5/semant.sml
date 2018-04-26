@@ -1,6 +1,5 @@
 structure Semant: 
 sig
-    type expty
     type venv
     type tenv
     
@@ -12,9 +11,7 @@ struct
     structure T = Types
     structure S = Symbol
     structure E = Env
-    structure Tr = Translate
 
-    type expty =  {exp:Tr.exp, ty: T.ty}
     
     type venv = Env.enventry Symbol.table
     type tenv = Env.ty Symbol.table

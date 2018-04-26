@@ -289,30 +289,32 @@ struct
 	
 	
 	
-    and transDec (venv, tenv,level,break, A.VarDec{name,escape, typ = NONE,init, pos}) = 
+    and transDec (venv, tenv,level, A.VarDec{name,escape, typ = NONE,init, pos},break) = 
         let val {exp, ty} = transExp (venv, tenv, level, break) init
+            val access = Translate.allocLocal(level)(!escape)
+            val exp' = R.simpleVar(access, level)
         in 
             case ty of
                 T.NIL => (err pos "varible without declared type cannot use nil";
-                          {tenv = tenv, venv = S.enter(venv, name, E.VarEntry{ty = ty})})
-              | _ => {tenv = tenv, venv = S.enter(venv, name, E.VarEntry{ty = ty})}
+                          {tenv = tenv, venv = S.enter(venv, name, E.VarEntry{ty = ty}), exps=[])}
+              | _ => {tenv = tenv, venv = S.enter(venv, name, E.VarEntry{ty = ty}), exps=[Tr.assgin(exp',exp)]}
         end
 
-    | transDec (venv, tenv,level,break, A.VarDec{name,escape,typ = SOME (type_id, _),init, pos}) =
+    | transDec (venv, tenv,level, A.VarDec{name,escape,typ = SOME (type_id, _),init, pos},break) =
         let val {exp, ty} = transExp (venv, tenv, level, break) init
         in (case Symbol.look(tenv, type_id) of
             NONE    => (err pos "unknown type"; 
-                       {tenv=tenv, venv=S.enter(venv, name, E.VarEntry{ty=ty})})
+                       {tenv=tenv, venv=S.enter(venv, name, E.VarEntry{ty=ty}),exps=[]})
           | SOME dataty => 
                 let
                     val dataty' = actual_ty(dataty, pos)
                 in
                     checkTypeSame(dataty, ty, pos);
-                    {tenv = tenv, venv = S.enter(venv, name, E.VarEntry{ty=ty})}
+                    {tenv = tenv, venv = S.enter(venv, name, E.VarEntry{ty=ty}),exps=[Tr.assgin(exp',exp)]}
                 end)
         end
 
-	| transDec (venv, tenv,level,break, A.TypeDec(tydecs)) = 
+	| transDec (venv, tenv,level, A.TypeDec(tydecs),break) = 
 	 	let val tenv' = List.foldr (fn(ty, env) => 
 	 	                S.enter (env, #name ty, T.NAME (#name ty, ref NONE))) tenv tydecs
 	 	    val tenv'' = List.foldr(fn(ty, env) => 
@@ -341,20 +343,20 @@ struct
 	 	in 
 	 	    checkeach(tydecs);
             checkdup(map #name tydecs, map #pos tydecs);
-	 	    {venv = venv, tenv = tenv''}
+	 	    {venv = venv, tenv = tenv'', exps=[]}
         end
 	 
-	| transDec(venv, tenv,level,break,A.FunctionDec(fundecs)) = 
-	 	let val venv' = List.foldr(fn(dec, env) => Symbol.enter(env, #name dec, transHeader(tenv, dec))) venv fundecs
+	| transDec(venv, tenv,level,A.FunctionDec(fundecs),break) = 
+	 	let val venv' = List.foldr(fn(dec, env) => Symbol.enter(env, #name dec, transHeader(tenv, level, dec))) venv fundecs
 	 	    fun runDec dec = 
 	 	        case Symbol.look(venv', #name dec) of
 	 	            NONE => ErrorMsg.impossible "No header found"
-	 	          | SOME(Env.FunEntry entry) => transFun(venv', tenv, entry, dec)
+	 	          | SOME(Env.FunEntry entry) => transFun(venv', tenv, entry, dec, break)
 	 	          | _ => ErrorMsg.impossible "Not function header"
 
 	 	in  checkdup(map #name fundecs, map #pos fundecs);
 	 	    List.map runDec fundecs;
-	 	    {venv = venv', tenv = tenv}
+	 	    {venv = venv', tenv = tenv, exps=[]}
 	 	end
 
         and transDecs(venv, tenv, level,break,[]) = {venv=venv, tenv=tenv}
@@ -364,19 +366,21 @@ struct
                end
 	and transHeader(tenv,level, {name, params, result, body, pos}) =
 	    let val params' = List.map #ty (List.map (transParam tenv) params)
+          val label = Temp.newlabel()
+          val level' = Translate.newlabel { parent = level, name = label, formals = List.map(fn p => !(#escape p)) params }
 	    in
 	        (case result of
 	        SOME (sym, pos) =>
 	            (case Symbol.look(tenv, sym) of
 	            NONE => (err pos "unkown type";
-	            E.FunEntry{formals=params', result=T.UNIT})
-	          | SOME (resTy) => E.FunEntry {formals=params', result=resTy} 
+	            E.FunEntry{formals=params', result=T.UNITm level = level', label = lebel})
+	          | SOME (resTy) => E.FunEntry {formals=params', result=resTy, level = level', label = label} 
 	            )
-	      | NONE => Env.FunEntry{formals = params', result = T.UNIT}
+	      | NONE => Env.FunEntry{formals = params', result = T.UNIT, level = level', label = label}
 	        )
 	    end
 
-	and transFun(venv, tenv, entry, break,{name, params, result, body, pos})=
+	and transFun(venv, tenv, entry,{name, params, result, body, pos}, break)=
 	    (case result of 
 	        SOME (res, resultPos) =>
 	            (case Symbol.look (tenv, res) of
@@ -384,24 +388,30 @@ struct
 	              | SOME resultTy =>
 	                    let val params' = List.map (transParam tenv) params
 	                        fun addparam ({name, ty}, env) = 
-	                            Symbol.enter(env, name, E.VarEntry {ty=ty})
+	                            Symbol.enter(env, name, E.VarEntry {ty=ty, access = Translate.allocLocal (#level entry) (!escape)})
 	                        val venv' = List.foldr addparam venv params'
-	                        val expResult = transExp(venv', tenv, level, break) body
+	                        val expResult = transExp(venv', tenv, (#level entry), break) body
+                          val entry = case Symbol.look (venv, name) of
+                              NONE => ErrorMsg.impossible "No function header found"
+                            | SOME (Env.FunEntry e) => e
+                            | _ => ErrorMsg.impossible "Function header cannot be varible"
 	                    in
-
-	                    	checkdup(map #name params, map #pos params);
-	                        checkTypeSame(#ty expResult,resultTy, pos)
+	                    	  checkdup(map #name params, map #pos params);
+	                        checkTypeSame(#ty expResult,resultTy, pos);
+                          Tr.functionDec (#label entry, #level entry, #exp expResult)
 	                    end
 	            )
 	      | NONE => (
 	            let val params' = List.map (transParam tenv) params
 	                fun addparam ({name, ty}, env) = 
-	                Symbol.enter(env, name, E.VarEntry {ty=ty})
+	                Symbol.enter(env, name, E.VarEntry {ty=ty, access = Translate.allocLocal (#level entry) (!escape)})
 	                val venv' = List.foldr addparam venv params'
-	                val expResult = transExp(venv', tenv, level, break) body
+	                val expResult = transExp(venv', tenv, (#level entry), break) body
 	            in
 	            	checkdup(map #name params, map #pos params);
-	                checkTypeSame(#ty expResult,T.UNIT, pos)
+	                checkTypeSame(#ty expResult,T.UNIT, pos);
+                  Tr.functionDec (#label entry, #level entry, #exp expResult)
+
 	            end
 	      )
 	    )
@@ -409,9 +419,9 @@ struct
 	and transParam tenv {name,escape, typ = typSym, pos} = 
 	    case Symbol.look (tenv, typSym) of
 	        NONE => (err pos "undefined paramter type"; 
-	                 {name = name, ty = T.NIL})
+	                 {name = name, ty = T.NIL, escape = escape})
 	      | SOME ty =>
-	            {name=name, ty=ty}
+	            {name=name, ty=ty, escape = escape}
 	            
 	and transTy (tenv,A.NameTy(sym,pos)) =
 	    (case S.look(tenv,sym) of SOME(t) => t
