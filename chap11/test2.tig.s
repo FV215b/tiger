@@ -6,7 +6,7 @@ main:
 	sw	$fp	0($sp)
 	move	$fp	$sp
 	addiu	$sp	$sp	-20
-L17:
+L20:
 sw $fp, 4($a0)
 move $k0, $ra
 move $k1, $s0
@@ -61,8 +61,8 @@ move $s2, $s1
 move $s1, $s0
 move $s0, $k1
 move $ra, $k0
-b L16
-L16:
+b L19
+L19:
 
 	move	$sp	$fp
 	lw	$fp	0($sp)

@@ -184,4 +184,4 @@ tyfields
 
 tyfields_nonempty
   : tyfield             ([tyfield])
-  | tyfields_nonempty COMMA tyfield                (tyfields_nonempty @ [tyfield])
+  | tyfields COMMA tyfield                (tyfields @ [tyfield])

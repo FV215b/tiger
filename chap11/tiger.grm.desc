@@ -2459,9 +2459,7 @@ state 116:
 state 117:
 
 	tyfields : tyfields_nonempty .  (reduce by rule 70)
-	tyfields_nonempty : tyfields_nonempty . COMMA tyfield 
 
-	COMMA	shift 128
 
 
 	.	reduce by rule 70
@@ -2471,8 +2469,10 @@ state 118:
 
 	fundec : FUNCTION ID LPAREN tyfields . RPAREN EQ exp 
 	fundec : FUNCTION ID LPAREN tyfields . RPAREN COLON ID EQ exp 
+	tyfields_nonempty : tyfields . COMMA tyfield 
 
-	RPAREN	shift 129
+	COMMA	shift 129
+	RPAREN	shift 128
 
 
 	.	error
@@ -2636,7 +2636,9 @@ state 125:
 state 126:
 
 	ty : LBRACE tyfields . RBRACE 
+	tyfields_nonempty : tyfields . COMMA tyfield 
 
+	COMMA	shift 129
 	RBRACE	shift 134
 
 
@@ -2671,23 +2673,23 @@ state 127:
 
 state 128:
 
-	tyfields_nonempty : tyfields_nonempty COMMA . tyfield 
+	fundec : FUNCTION ID LPAREN tyfields RPAREN . EQ exp 
+	fundec : FUNCTION ID LPAREN tyfields RPAREN . COLON ID EQ exp 
 
-	ID	shift 120
+	COLON	shift 137
+	EQ	shift 136
 
-	tyfield	goto 136
 
 	.	error
 
 
 state 129:
 
-	fundec : FUNCTION ID LPAREN tyfields RPAREN . EQ exp 
-	fundec : FUNCTION ID LPAREN tyfields RPAREN . COLON ID EQ exp 
+	tyfields_nonempty : tyfields COMMA . tyfield 
 
-	COLON	shift 138
-	EQ	shift 137
+	ID	shift 120
 
+	tyfield	goto 138
 
 	.	error
 
@@ -2814,15 +2816,6 @@ state 135:
 
 state 136:
 
-	tyfields_nonempty : tyfields_nonempty COMMA tyfield .  (reduce by rule 72)
-
-
-
-	.	reduce by rule 72
-
-
-state 137:
-
 	fundec : FUNCTION ID LPAREN tyfields RPAREN EQ . exp 
 
 	ID	shift 17
@@ -2847,7 +2840,7 @@ state 137:
 	.	error
 
 
-state 138:
+state 137:
 
 	fundec : FUNCTION ID LPAREN tyfields RPAREN COLON . ID EQ exp 
 
@@ -2855,6 +2848,15 @@ state 138:
 
 
 	.	error
+
+
+state 138:
+
+	tyfields_nonempty : tyfields COMMA tyfield .  (reduce by rule 72)
+
+
+
+	.	reduce by rule 72
 
 
 state 139:
@@ -3009,5 +3011,5 @@ state 145:
 
 	.	error
 
-592 of 1113 action table entries left after compaction
+593 of 1114 action table entries left after compaction
 247 goto table entries
