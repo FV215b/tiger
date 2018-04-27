@@ -20,28 +20,34 @@ fun codegen (frame) (stm: Tree.stm): Assem.instr list =
 
 
         fun munchStm(T.SEQ(a, b)) = (munchStm(a); munchStm(b))
+
+          | munchStm(T.MOVE (T.TEMP t1, T.TEMP t2)) = 
+            emit (A.MOVE
+              { assem = "move `d0, `s0"
+              , src = t2, dst = t1
+              })
           
           | munchStm(T.LABEL lab) =
             emit(A.LABEL{assem=Symbol.name(lab) ^ ":",lab=lab})
           
           | munchStm(T.MOVE(T.MEM(T.BINOP(T.PLUS, e1, T.CONST i)), e2)) =
             emit(A.OPER{assem="sw `s0, " ^ int i ^ "(`s1)",
-                        src=[munchExp e1, munchExp e2],
+                        src=[munchExp e2, munchExp e1],
                         dst=[],jump=NONE})
 
           | munchStm(T.MOVE(T.MEM(T.BINOP(T.PLUS, T.CONST i, e1)), e2)) =
             emit(A.OPER{assem="sw `s0, " ^ int i ^ "(`s1)",
-                        src=[munchExp e1, munchExp e2],
+                        src=[munchExp e2, munchExp e1],
                         dst=[],jump=NONE})
 
           | munchStm(T.MOVE(T.MEM(T.BINOP(T.MINUS, e1, T.CONST i)), e2)) =
             emit(A.OPER{assem="sw `s0, " ^ int (~i) ^ "(`s1)",
-                        src=[munchExp e1, munchExp e2],
+                        src=[munchExp e2, munchExp e1],
                         dst=[],jump=NONE})
 
           | munchStm(T.MOVE(T.MEM(T.BINOP(T.MINUS, T.CONST i, e1)), e2)) =
             emit(A.OPER{assem="sw `s0, " ^ int (~i) ^ "(`s1)",
-                        src=[munchExp e1, munchExp e2],
+                        src=[munchExp e2, munchExp e1],
                         dst=[],jump=NONE})
 
           | munchStm(T.MOVE(T.MEM(e1), e2)) =
