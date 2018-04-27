@@ -1,0 +1,2 @@
+Skeleton 5
+d2f8d"Int"d"List"d"Temp"Cd"Semant"d"TextIO"d"Printtree"ä¢Assem"d"Canon"Cä¢Frame"d"Parse"d"RegAlloc"d"MipsGen"d"PrintAbsyn"Nad"Main"h4ad"Tr"gp1d"Translate"ad"F"gp1ÿad"A"gp1ÿ7ad"S"gp1d"Symbol"

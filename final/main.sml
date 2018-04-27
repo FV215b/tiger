@@ -30,7 +30,7 @@ end
 
 fun strHandler out (F.STRING(lab,str))= TextIO.output(out,prtString(lab,str))
 
-fun main filename =
+fun  main filename =
 let val absyn = Parse.parse filename
     val frags = Semant.transProg absyn
     val (procs,strs) =
@@ -48,5 +48,68 @@ in
 	TextIO.closeOut out;
     ()
 end
+
+fun parsePhase filename = 
+let val absyntree = Parse.parse filename
+in 
+    PrintAbsyn.print (TextIO.stdOut, absyntree)
+end
+
+fun semantprocHandler proc  =                          
+let                              
+    val (body,frame) = case proc of F.PROC{body,frame} => (body,frame)
+in 
+	TextIO.print("body of semant output:\n");
+	Printtree.printtree (TextIO.stdOut,body);
+	TextIO.print("label of frame:\n");
+	TextIO.print(S.name (#name frame));
+	TextIO.print("locals:"^(Int.toString (!(#locals frame)))^"\n");
+	TextIO.print("instrs:\n ");
+	app (fn x => Printtree.printtree (TextIO.stdOut,x))(#instrs frame)
+   
+	
+end
+
+
+fun semantPhase filename =
+let val absyn = Parse.parse filename
+    val frags = Semant.transProg absyn
+    val procs  =
+            List.filter
+                (fn (x) => case x of
+                               F.PROC(_) => true
+                             | _ => false) frags
+in 
+    app semantprocHandler procs
+end
                                                           
+fun codegenprocHandler proc  =                          
+let                              
+    val (body,frame) = case proc of F.PROC{body,frame} => (body,frame)
+    val stms = Canon.linearize body
+    val stms' = Canon.traceSchedule(Canon.basicBlocks stms)
+    val instrs = List.concat(map (MipsGen.codegen frame) stms')
+	val format1 = Assem.format(Frame.tempToString)
+    fun instrPrint instr = TextIO.print((format1 instr) ^ "\n")
+in 
+	app instrPrint instrs
+end
+
+
+fun codegenPhase filename =
+let val absyn = Parse.parse filename
+    val frags = Semant.transProg absyn
+    val procs  =
+            List.filter
+                (fn (x) => case x of
+                               F.PROC(_) => true
+                             | _ => false) frags
+in 
+    app codegenprocHandler procs
+end
+                                                          
+
+
+
+
 end                        
